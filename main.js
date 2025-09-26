@@ -1,10 +1,11 @@
 import { STUDENT_CODES } from './data/studentCodes.js';
 
-// ⚠️ JSONBin.io Configuration - أدخل بياناتك هنا
+// ⚠️ JSONBin.io Configuration - يجب نقل هذه المعلومات إلى متغيرات البيئة في بيئة الإنتاج
+// في بيئة المتصفح، لا يمكن استخدام process.env مباشرة، لذلك نستخدم القيم الافتراضية
 const JSONBIN_CONFIG = {
-  API_KEY: '$2a$10$fuuDWFJZi.HrgUohTmYJced2J.i2oUiPYpNMzGax/x/MK3CM31EZu', // 🔑 ضع الـ Master Key هنا
-  HOMEWORK_BIN: '68d66c19d0ea881f408bb3b3', // 📚 ضع bin ID للواجبات هنا
-  ANNOUNCEMENTS_BIN: '68d66c3143b1c97be950c256', // 📢 ضع bin ID للتبليغات هنا
+  API_KEY: (typeof process !== 'undefined' && process.env?.JSONBIN_API_KEY) || '$2a$10$fuuDWFJZi.HrgUohTmYJced2J.i2oUiPYpNMzGax/x/MK3CM31EZu', // 🔑 يُفضل استخدام متغير البيئة
+  HOMEWORK_BIN: (typeof process !== 'undefined' && process.env?.HOMEWORK_BIN) || '68d66c19d0ea881f408bb3b3', // 📚 يُفضل استخدام متغير البيئة
+  ANNOUNCEMENTS_BIN: (typeof process !== 'undefined' && process.env?.ANNOUNCEMENTS_BIN) || '68d66c3143b1c97be950c256', // 📢 يُفضل استخدام متغير البيئة
   BASE_URL: 'https://api.jsonbin.io/v3/b'
 };
 
@@ -32,58 +33,213 @@ const LS_KEYS = {
 
 // JSONBin.io API Functions
 async function fetchFromBin(binId) {
+  if (!binId || !JSONBIN_CONFIG.API_KEY) {
+    console.warn('Missing binId or API key for JSONBin operation');
+    return null;
+  }
+  
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+    
     const response = await fetch(`${JSONBIN_CONFIG.BASE_URL}/${binId}/latest`, {
       headers: {
-        'X-Master-Key': JSONBIN_CONFIG.API_KEY
-      }
+        'X-Master-Key': JSONBIN_CONFIG.API_KEY,
+        'Content-Type': 'application/json'
+      },
+      signal: controller.signal
     });
-    if (!response.ok) throw new Error('Network response was not ok');
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const data = await response.json();
     return data.record;
   } catch (error) {
-    console.error('Error fetching from JSONBin:', error);
+    if (error.name === 'AbortError') {
+      console.error('JSONBin fetch request timed out');
+    } else {
+      console.error('Error fetching from JSONBin:', error.message);
+    }
     return null;
   }
 }
 
 async function saveToBin(binId, data) {
+  if (!binId || !JSONBIN_CONFIG.API_KEY || !data) {
+    console.warn('Missing required parameters for JSONBin save operation');
+    return false;
+  }
+  
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout for saves
+    
     const response = await fetch(`${JSONBIN_CONFIG.BASE_URL}/${binId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'X-Master-Key': JSONBIN_CONFIG.API_KEY
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      signal: controller.signal
     });
-    if (!response.ok) throw new Error('Network response was not ok');
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     return true;
   } catch (error) {
-    console.error('Error saving to JSONBin:', error);
+    if (error.name === 'AbortError') {
+      console.error('JSONBin save request timed out');
+    } else {
+      console.error('Error saving to JSONBin:', error.message);
+    }
     return false;
   }
 }
 
-// Local storage fallback functions
-const getJSON = (k, d) => {
-  try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; }
-}
-const setJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+// Local storage fallback functions with enhanced error handling
+const getJSON = (key, defaultValue) => {
+  if (!key) return defaultValue;
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : defaultValue;
+  } catch (error) {
+    console.warn(`Error reading from localStorage key "${key}":`, error.message);
+    return defaultValue;
+  }
+};
 
-// Initialize persisted datasets
+const setJSON = (key, value) => {
+  if (!key) return false;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (error) {
+    console.error(`Error writing to localStorage key "${key}":`, error.message);
+    return false;
+  }
+};
+
+// Theme management functions
+function isDarkMode() {
+  return getJSON('theme.darkMode', false);
+}
+
+function setDarkMode(enabled) {
+  setJSON('theme.darkMode', enabled);
+  applyTheme(enabled);
+}
+
+function applyTheme(isDark) {
+  const body = document.body;
+  const icon = document.getElementById('themeIcon');
+  
+  if (isDark) {
+    body.classList.add('dark-mode');
+    if (icon) icon.textContent = '☀️';
+    console.log('🌙 تم تفعيل الوضع المظلم');
+  } else {
+    body.classList.remove('dark-mode');
+    if (icon) icon.textContent = '🌙';
+    console.log('☀️ تم تفعيل الوضع الفاتح');
+  }
+}
+
+function toggleTheme() {
+  const currentlyDark = isDarkMode();
+  setDarkMode(!currentlyDark);
+  toastSuccess(!currentlyDark ? '🌙 تم التبديل للوضع المظلم' : '☀️ تم التبديل للوضع الفاتح');
+}
+
+// Simple Loader functions
+function showLoader() {
+  const loader = document.getElementById('simpleLoader');
+  if (loader) {
+    loader.classList.remove('hidden');
+  }
+}
+
+function hideLoader() {
+  const loader = document.getElementById('simpleLoader');
+  if (loader) {
+    loader.classList.add('hidden');
+  }
+}
+
+// Date computation function (moved up)
+
+// Initialize persisted datasets with sample data
 function initDatasets() {
   if (!getJSON(LS_KEYS.CODES, null)) {
     // Clone to avoid mutating import
     const copy = JSON.parse(JSON.stringify(STUDENT_CODES));
     setJSON(LS_KEYS.CODES, copy);
   }
-  // Subjects removed from creation flow; keep key for backward compatibility but don't (re)initialize
-  if (!getJSON(LS_KEYS.HOMEWORK, null)) {
-    setJSON(LS_KEYS.HOMEWORK, []);
+  
+  // إضافة واجبات تجريبية إذا لم توجد
+  if (!getJSON(LS_KEYS.HOMEWORK, null) || getJSON(LS_KEYS.HOMEWORK, []).length === 0) {
+    const sampleHomework = [
+      {
+        id: Date.now() + 1,
+        title: 'واجب الرياضيات - الفصل الثالث',
+        description: 'حل التمارين من صفحة 45 إلى صفحة 50\n\nيجب كتابة الحلول بخط واضح\nمع تفسير طريقة الحل',
+        dueDay: 'الأحد',
+        section: '1',
+        createdByCode: 'S1001a',
+        creatorName: 'باقر أسعد حسين',
+        isArchived: false,
+        createdAt: new Date().toISOString(),
+        archiveAt: computeArchiveAt('الأحد', new Date().toISOString()),
+        viewsCount: 5,
+        viewers: ['S1003', 'S1004']
+      },
+      {
+        id: Date.now() + 2,
+        title: 'واجب الفيزياء - قوانين الحركة',
+        description: 'دراسة الفصل الخامس من الكتاب\n\nحل المسائل من 1 إلى 10\n\nكتابة تقرير صفحة واحدة عن قوانين نيوتن',
+        dueDay: 'الاثنين',
+        section: '1',
+        createdByCode: 'S1002a',
+        creatorName: 'محمد علي',
+        isArchived: false,
+        createdAt: new Date().toISOString(),
+        archiveAt: computeArchiveAt('الاثنين', new Date().toISOString()),
+        viewsCount: 3,
+        viewers: ['S1003']
+      }
+    ];
+    setJSON(LS_KEYS.HOMEWORK, sampleHomework);
   }
-  if (!getJSON(LS_KEYS.ANNOUNCEMENTS, null)) {
-    setJSON(LS_KEYS.ANNOUNCEMENTS, []);
+  
+  // إضافة تبليغات تجريبية إذا لم توجد
+  if (!getJSON(LS_KEYS.ANNOUNCEMENTS, null) || getJSON(LS_KEYS.ANNOUNCEMENTS, []).length === 0) {
+    const sampleAnnouncements = [
+      {
+        id: Date.now() + 10,
+        title: 'إعلان مهم - امتحانات الفصل الثاني',
+        body: 'تبدأ امتحانات الفصل الثاني يوم الأحد القادم\n\nيرجى من جميع الطلاب الاستعداد جيداً\n\nجدول الامتحانات معلق في الإدارة',
+        creator: 'إدارة المدرسة',
+        createdAt: new Date().toISOString(),
+        isArchived: false
+      },
+      {
+        id: Date.now() + 11,
+        title: 'تنبيه - مواعيد الحضور',
+        body: 'يرجى من جميع الطلاب الالتزام بمواعيد الحضور\n\nبداية الدوام الساعة 8:00 صباحاً\n\nعدم التأخير أكثر من 15 دقيقة',
+        creator: 'قسم الإرشاد',
+        createdAt: new Date().toISOString(),
+        isArchived: false
+      }
+    ];
+    setJSON(LS_KEYS.ANNOUNCEMENTS, sampleAnnouncements);
   }
 }
 
@@ -99,40 +255,58 @@ function setCodes(c) { setJSON(LS_KEYS.CODES, c); }
 
 // JSONBin functions for homework and announcements
 async function getHomework() {
-  const binData = await fetchFromBin(JSONBIN_CONFIG.HOMEWORK_BIN);
-  if (binData && binData.homework) {
-    return binData.homework;
+  try {
+    const binData = await fetchFromBin(JSONBIN_CONFIG.HOMEWORK_BIN);
+    if (binData && binData.homework) {
+      // حفظ في localStorage كنسخة احتياطية
+      setJSON(LS_KEYS.HOMEWORK, binData.homework);
+      return binData.homework;
+    }
+  } catch (error) {
+    console.warn('فشل في جلب البيانات من JSONBin، استخدام البيانات المحلية:', error.message);
   }
   // Fallback to localStorage if JSONBin fails
   return getJSON(LS_KEYS.HOMEWORK, []);
 }
 
 async function setHomework(list) {
-  const success = await saveToBin(JSONBIN_CONFIG.HOMEWORK_BIN, { homework: list });
-  if (success) {
-    console.log('✅ Homework saved to JSONBin successfully');
-  } else {
-    console.log('❌ Failed to save to JSONBin, using localStorage fallback');
-    setJSON(LS_KEYS.HOMEWORK, list);
+  // حفظ في localStorage أولاً كضمان
+  setJSON(LS_KEYS.HOMEWORK, list);
+  try {
+    const success = await saveToBin(JSONBIN_CONFIG.HOMEWORK_BIN, { homework: list });
+    if (!success) {
+      console.warn('فشل حفظ البيانات في JSONBin، البيانات محفوظة محلياً');
+    }
+  } catch (error) {
+    console.warn('خطأ في حفظ البيانات:', error.message);
   }
 }
 
 async function getAnnouncements() {
-  const binData = await fetchFromBin(JSONBIN_CONFIG.ANNOUNCEMENTS_BIN);
-  if (binData && binData.announcements) {
-    return binData.announcements;
+  try {
+    const binData = await fetchFromBin(JSONBIN_CONFIG.ANNOUNCEMENTS_BIN);
+    if (binData && binData.announcements) {
+      // حفظ في localStorage كنسخة احتياطية
+      setJSON(LS_KEYS.ANNOUNCEMENTS, binData.announcements);
+      return binData.announcements;
+    }
+  } catch (error) {
+    console.warn('فشل في جلب التبليغات من JSONBin، استخدام البيانات المحلية:', error.message);
   }
   // Fallback to localStorage if JSONBin fails
   return getJSON(LS_KEYS.ANNOUNCEMENTS, []);
 }
 
 async function setAnnouncements(list) {
-  const success = await saveToBin(JSONBIN_CONFIG.ANNOUNCEMENTS_BIN, { announcements: list });
-  if (success) {
-    console.log('✅ Announcements saved to JSONBin successfully');
-  } else {
-    console.log('❌ Failed to save to JSONBin, using localStorage fallback');
-    setJSON(LS_KEYS.ANNOUNCEMENTS, list);
+  // حفظ في localStorage أولاً كضمان
+  setJSON(LS_KEYS.ANNOUNCEMENTS, list);
+  try {
+    const success = await saveToBin(JSONBIN_CONFIG.ANNOUNCEMENTS_BIN, { announcements: list });
+    if (!success) {
+      console.warn('فشل حفظ التبليغات في JSONBin، البيانات محفوظة محلياً');
+    }
+  } catch (error) {
+    console.warn('خطأ في حفظ التبليغات:', error.message);
   }
 }
 
@@ -142,6 +316,8 @@ const studentLoginSection = document.getElementById('studentLoginSection');
 const dashboardSection = document.getElementById('dashboardSection');
 const signInBtn = document.getElementById('signInBtn');
 const signOutBtn = document.getElementById('signOutBtn');
+const themeToggle = document.getElementById('themeToggle');
+const themeIcon = document.getElementById('themeIcon');
 
 const studentLoginForm = document.getElementById('studentLoginForm');
 const studentNameInput = document.getElementById('studentName');
@@ -183,24 +359,25 @@ const modalTitle = document.getElementById('modalTitle');
 const modalBody = document.getElementById('modalBody');
 const modalMeta = document.getElementById('modalMeta');
 
-// Bind modal close globally so it's always closable
-if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeModal);
-if (modalOverlay) modalOverlay.addEventListener('click', (e) => {
-  if (e.target === modalOverlay) closeModal();
-});
 const createHomeworkForm = document.getElementById('createHomeworkForm');
 
-function show(el) { el.classList.remove('hidden'); }
-function hide(el) { el.classList.add('hidden'); }
+function show(el) { if (el) el.classList.remove('hidden'); }
+function hide(el) { if (el) el.classList.add('hidden'); }
 
 function setActiveTab(id) {
-  tabBtns.forEach(btn => {
-    const active = btn.dataset.tab === id;
-    btn.classList.toggle('active', active);
-  });
-  Object.entries(tabPanels).forEach(([key, panel]) => {
-    if (key === id) show(panel); else hide(panel);
-  });
+  if (tabBtns && tabBtns.length) {
+    tabBtns.forEach(btn => {
+      const active = btn.dataset.tab === id;
+      btn.classList.toggle('active', active);
+    });
+  }
+  if (tabPanels) {
+    Object.entries(tabPanels).forEach(([key, panel]) => {
+      if (panel) {
+        if (key === id) show(panel); else hide(panel);
+      }
+    });
+  }
 }
 
 // Subjects removed from creation flow
@@ -211,7 +388,7 @@ function formatViews(hw) {
 }
 
 function openHomeworkDetails(hw) {
-  if (!modalOverlay) return;
+  if (!modalOverlay || !modalTitle || !modalBody) return;
   modalTitle.textContent = hw.title || '';
   
   // تنسيق خاص للواجبات: المعلومات الفوقية، الواجب، المعلومات الجوة
@@ -254,7 +431,7 @@ function openHomeworkDetails(hw) {
 }
 
 function openAnnouncementDetails(ann) {
-  if (!modalOverlay) return;
+  if (!modalOverlay || !modalTitle || !modalBody) return;
   modalTitle.textContent = ann.title || '';
   modalBody.textContent = ann.body || '';
   if (modalMeta) {
@@ -275,11 +452,16 @@ function closeModal() {
 }
 
 function ensureViewCount(hw, viewerCode) {
+  if (!hw || typeof hw !== 'object') return false;
+  
   hw.viewers = hw.viewers || [];
+  hw.viewsCount = hw.viewsCount || 0;
+  
   if (!viewerCode) return false;
+  
   if (!hw.viewers.includes(viewerCode)) {
     hw.viewers.push(viewerCode);
-    hw.viewsCount = (hw.viewsCount || 0) + 1;
+    hw.viewsCount = hw.viewsCount + 1;
     return true;
   }
   return false;
@@ -327,14 +509,18 @@ async function checkAndAutoArchive() {
   }
   if (changed) {
     await setHomework(all);
-    // Refresh UI if visible
-    await renderHomework();
-    await renderArchived();
+    // تحديث الواجهة فقط إذا كان المستخدم مسجلاً للدخول
+    const session = getSession();
+    if (session) {
+      await renderHomework();
+      await renderArchived();
+    }
   }
 }
 
 async function renderHomework() {
   const session = getSession();
+  if (!session || !homeworkListEl) return;
   const all = await getHomework();
   const isAdmin = !!session.isAdmin;
   const current = all.filter(h => !h.isArchived && (isAdmin || h.section === session.section));
@@ -354,30 +540,24 @@ async function renderHomework() {
     const canArchive = isAdmin || hw.createdByCode === session.studentCode;
     const canDelete = isAdmin;
     const card = document.createElement('div');
-    card.className = 'bg-white border-2 border-gray-200 rounded-xl p-6 transition-all hover:shadow-lg hover:border-blue-300';
+    card.className = 'bg-white border border-gray-200 rounded-lg p-4 transition-all hover:shadow-md hover:border-blue-300';
     card.innerHTML = `
-      <div class="homework-card-layout">
-        <!-- المعلومات العلوية -->
-        <div class="top-info space-y-1 mb-4">
-          ${hw.dueDay ? `<p class="text-sm text-orange-600 font-medium">📅 موعد التسليم: ${hw.dueDay}</p>` : ''}
-          ${hw.creatorName ? `<p class="text-sm text-blue-600">👤 بواسطة: ${hw.creatorName}</p>` : ''}
-        </div>
-        
-        <!-- الواجب (العنوان) -->
-        <div class="homework-title mb-4">
-          <h3 class="text-xl font-bold text-gray-800 text-center py-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">${hw.title}</h3>
-        </div>
-        
-        <!-- المعلومات السفلية -->
-        <div class="bottom-info flex items-center justify-between">
-          <div class="info-left">
+      <div class="flex items-start justify-between">
+        <!-- المعلومات اليسرى -->
+        <div class="flex-1">
+          <h3 class="text-lg font-bold text-gray-800 mb-2">${hw.title}</h3>
+          <div class="space-y-1">
+            ${hw.dueDay ? `<p class="text-sm text-orange-600 font-medium">📅 موعد التسليم: ${hw.dueDay}</p>` : ''}
+            ${hw.creatorName ? `<p class="text-sm text-blue-600">👤 بواسطة: ${hw.creatorName}</p>` : ''}
             <p class="text-sm text-gray-500">👁 ${formatViews(hw)}</p>
           </div>
-          <div class="action-buttons flex gap-2">
-            <button data-id="${hw.id}" class="zoom-btn px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-all hover:bg-blue-700">تكبير</button>
-            ${canArchive ? `<button data-id="${hw.id}" class="archive-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium transition-all hover:bg-red-600 hover:text-white">أرشفة</button>` : ''}
-            ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition-all hover:bg-red-700">حذف</button>` : ''}
-          </div>
+        </div>
+        
+        <!-- الأزرار اليمين -->
+        <div class="flex flex-col gap-2 ml-4">
+          <button data-id="${hw.id}" class="zoom-btn px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-all">تكبير</button>
+          ${canArchive ? `<button data-id="${hw.id}" class="archive-btn px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm font-medium hover:bg-red-600 hover:text-white transition-all">أرشفة</button>` : ''}
+          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>` : ''}
         </div>
       </div>`;
     homeworkListEl.appendChild(card);
@@ -412,6 +592,7 @@ async function renderHomework() {
 
 async function renderArchived() {
   const session = getSession();
+  if (!session || !archivedListEl) return;
   const all = await getHomework();
   const isAdmin = !!session.isAdmin;
   const archived = all.filter(h => h.isArchived && (isAdmin || h.section === session.section));
@@ -473,75 +654,225 @@ async function renderArchived() {
 }
 
 async function archiveHomework(id) {
-  const all = await getHomework();
-  const idx = all.findIndex(h => String(h.id) === String(id));
-  if (idx === -1) return;
-  
-  const hw = all[idx];
-  if (!confirm(`هل أنت متأكد من أرشفة الواجب: "${hw.title}"\n\nسينتقل إلى قسم الواجبات القديمة`)) return;
-  
-  all[idx].isArchived = true;
-  await setHomework(all);
-  toastSuccess('تم نقل الواجب إلى الواجبات القديمة');
-  await renderHomework();
-  await renderArchived();
+  try {
+    const all = await getHomework();
+    const idx = all.findIndex(h => String(h.id) === String(id));
+    if (idx === -1) {
+      toastError('لم يتم العثور على الواجب');
+      return;
+    }
+    
+    const hw = all[idx];
+    if (!confirm(`هل أنت متأكد من أرشفة الواجب: "${hw.title}"\n\nسينتقل إلى قسم الواجبات القديمة`)) {
+      return;
+    }
+    
+    all[idx].isArchived = true;
+    all[idx].archivedAt = new Date().toISOString();
+    
+    await setHomework(all);
+    toastSuccess('تم نقل الواجب إلى الواجبات القديمة');
+    
+    await Promise.all([renderHomework(), renderArchived()]);
+  } catch (error) {
+    console.error('Error archiving homework:', error);
+    toastError('حدث خطأ أثناء أرشفة الواجب');
+  }
 }
 
 async function deleteHomework(id) {
-  const all = await getHomework();
-  const hw = all.find(h => String(h.id) === String(id));
-  if (!hw) return;
+  try {
+    const all = await getHomework();
+    const hw = all.find(h => String(h.id) === String(id));
+    
+    if (!hw) {
+      toastError('لم يتم العثور على الواجب');
+      return;
+    }
+    
+    if (!confirm(`هل أنت متأكد من حذف الواجب: "${hw.title}"\n\nهذا الإجراء لا يمكن التراجع عنه!`)) {
+      return;
+    }
+    
+    const filtered = all.filter(h => String(h.id) !== String(id));
+    await setHomework(filtered);
+    toastSuccess('تم حذف الواجب');
+    
+    await Promise.all([renderHomework(), renderArchived()]);
+  } catch (error) {
+    console.error('Error deleting homework:', error);
+    toastError('حدث خطأ أثناء حذف الواجب');
+  }
+}
+
+// Enhanced Form validation functions with better security and validation
+function validateHomeworkForm(title, description, dueDay) {
+  const errors = [];
   
-  if (!confirm(`هل أنت متأكد من حذف الواجب: "${hw.title}"\n\nهذا الإجراء لا يمكن التراجع عنه!`)) return;
+  // فحص العنوان
+  if (!title || typeof title !== 'string') {
+    errors.push('يجب إدخال عنوان صحيح');
+  } else if (title.trim().length < 3) {
+    errors.push('عنوان الواجب يجب أن يكون 3 أحرف على الأقل');
+  } else if (title.trim().length > 100) {
+    errors.push('عنوان الواجب يجب ألا يتجاوز 100 حرف');
+  }
   
-  const filtered = all.filter(h => String(h.id) !== String(id));
-  await setHomework(filtered);
-  toastSuccess('تم حذف الواجب');
-  await renderHomework();
-  await renderArchived();
+  // فحص الوصف
+  if (!description || typeof description !== 'string') {
+    errors.push('يجب إدخال تفاصيل الواجب');
+  } else if (description.trim().length < 10) {
+    errors.push('تفاصيل الواجب يجب أن تكون 10 أحرف على الأقل');
+  } else if (description.trim().length > 500) {
+    errors.push('تفاصيل الواجب يجب ألا تتجاوز 500 حرف');
+  }
+  
+  // فحص يوم الاستحقاق
+  const validDays = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  if (!dueDay) {
+    errors.push('يجب اختيار يوم الاستحقاق');
+  } else if (!validDays.includes(dueDay)) {
+    errors.push('يوم الاستحقاق غير صحيح');
+  }
+  
+  return errors;
+}
+
+function validateAnnouncementForm(title, body) {
+  const errors = [];
+  
+  // فحص العنوان
+  if (!title || typeof title !== 'string') {
+    errors.push('يجب إدخال عنوان صحيح');
+  } else if (title.trim().length < 3) {
+    errors.push('عنوان التبليغ يجب أن يكون 3 أحرف على الأقل');
+  } else if (title.trim().length > 80) {
+    errors.push('عنوان التبليغ يجب ألا يتجاوز 80 حرف');
+  }
+  
+  // فحص نص التبليغ
+  if (!body || typeof body !== 'string') {
+    errors.push('يجب إدخال نص التبليغ');
+  } else if (body.trim().length < 5) {
+    errors.push('نص التبليغ يجب أن يكون 5 أحرف على الأقل');
+  } else if (body.trim().length > 300) {
+    errors.push('نص التبليغ يجب ألا يتجاوز 300 حرف');
+  }
+  
+  return errors;
+}
+
+function validateStudentLogin(name, code) {
+  const errors = [];
+  
+  // فحص الاسم
+  if (!name || typeof name !== 'string') {
+    errors.push('يجب إدخال اسم صحيح');
+  } else if (name.trim().length < 2) {
+    errors.push('يجب إدخال اسم صحيح (حرفين على الأقل)');
+  } else if (name.trim().length > 50) {
+    errors.push('الاسم طويل جداً (أقصى حد 50 حرف)');
+  } else if (!/^[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿\sa-zA-Z]+$/.test(name.trim())) {
+    errors.push('الاسم يجب أن يحتوي على أحرف عربية أو إنجليزية فقط');
+  }
+  
+  // فحص الكود
+  if (!code || typeof code !== 'string') {
+    errors.push('يجب إدخال كود صحيح');
+  } else if (code.trim().length < 4) {
+    errors.push('يجب إدخال كود صحيح');
+  } else if (code.trim().length > 10) {
+    errors.push('الكود طويل جداً');
+  } else if (!/^[A-Za-z0-9]+$/.test(code.trim())) {
+    errors.push('الكود يجب أن يحتوي على أحرف وأرقام إنجليزية فقط');
+  }
+  
+  return errors;
+}
+
+// تحسين دالة تنظيف المدخلات
+function sanitizeInput(input) {
+  if (typeof input !== 'string') return input;
+  
+  // إزالة المسافات الزائدة
+  let cleaned = input.trim();
+  
+  // إزالة HTML tags و script tags
+  cleaned = cleaned.replace(/<script[^>]*>.*?<\/script>/gi, '');
+  cleaned = cleaned.replace(/<[^>]*>/g, '');
+  
+  // إزالة أحرف خطيرة
+  cleaned = cleaned.replace(/[<>"'&]/g, '');
+  
+  // إزالة المسافات الزائدة في النهاية
+  return cleaned.trim();
 }
 
 async function createHomework(e) {
   e.preventDefault();
+  
   const session = getSession();
-  const title = hwTitle.value.trim();
-  const description = hwDescription.value.trim();
+  if (!session) {
+    toastError('يجب تسجيل الدخول أولاً');
+    return;
+  }
+  
+  const title = sanitizeInput(hwTitle.value.trim());
+  const description = sanitizeInput(hwDescription.value.trim());
   const dueDay = hwDueDay ? hwDueDay.value : '';
-  if (!title || !description || !dueDay) return;
+  
+  // Validate form
+  const errors = validateHomeworkForm(title, description, dueDay);
+  if (errors.length > 0) {
+    toastError(errors[0]); // Show first error
+    return;
+  }
 
   const targetSection = (session.isAdmin && hwSectionAdmin && hwSectionAdmin.value) ? hwSectionAdmin.value : session.section;
   const createdAt = new Date().toISOString();
   const archiveAt = computeArchiveAt(dueDay, createdAt);
 
-  const all = await getHomework();
-  all.unshift({
-    id: Date.now(),
-    title,
-    description,
-    dueDay: dueDay || '',
-    section: targetSection,
-    createdByCode: session.studentCode,
-    creatorName: session.studentName,
-    isArchived: false,
-    createdAt,
-    archiveAt,
-    viewsCount: 0,
-    viewers: [],
-  });
-  await setHomework(all);
-  toastSuccess('تم إنشاء الواجب بنجاح!');
-  hwTitle.value = '';
-  hwDescription.value = '';
-  if (hwDueDay) hwDueDay.value = '';
-  if (hwSectionAdmin) hwSectionAdmin.value = '';
-  setActiveTab('homework');
-  await renderHomework();
+  try {
+    const all = await getHomework();
+    const newHomework = {
+      id: Date.now() + Math.random(), // Better unique ID
+      title,
+      description,
+      dueDay: dueDay || '',
+      section: targetSection,
+      createdByCode: session.studentCode,
+      creatorName: session.studentName,
+      isArchived: false,
+      createdAt,
+      archiveAt,
+      viewsCount: 0,
+      viewers: [],
+    };
+    
+    all.unshift(newHomework);
+    await setHomework(all);
+    toastSuccess('تم إنشاء الواجب بنجاح!');
+    
+    // Clear form
+    hwTitle.value = '';
+    hwDescription.value = '';
+    if (hwDueDay) hwDueDay.value = '';
+    if (hwSectionAdmin) hwSectionAdmin.value = '';
+    
+    setActiveTab('homework');
+    await renderHomework();
+  } catch (error) {
+    console.error('Error creating homework:', error);
+    toastError('حدث خطأ أثناء إنشاء الواجب');
+  }
 }
 
 function onSignIn() {
-  setAuth(true);
-  toastSuccess('تم تسجيل الدخول');
-  renderApp();
+  // إخفاء authSection وإظهار studentLoginSection
+  hide(authSection);
+  show(studentLoginSection);
+  
+  toastSuccess('مرحباً بك! أدخل بياناتك');
 }
 
 function onSignOut() {
@@ -559,137 +890,308 @@ function onSignOut() {
   renderApp();
 }
 
-function onStudentLogin(e) {
+// دالة لتنظيف جميع الأكواد المستخدمة (للاختبار)
+function clearAllActiveCodes() {
+  const codes = getCodes();
+  Object.keys(codes).forEach(code => {
+    codes[code].isActive = false;
+  });
+  setCodes(codes);
+}
+
+
+async function onStudentLogin(e) {
   e.preventDefault();
-  const name = studentNameInput.value.trim();
-  const code = studentCodeInput.value.trim();
-  if (!name || !code) return;
+  
+  const name = sanitizeInput(studentNameInput.value.trim());
+  const code = sanitizeInput(studentCodeInput.value.trim());
+  
+  // Validate inputs
+  const errors = validateStudentLogin(name, code);
+  if (errors.length > 0) {
+    toastError(errors[0]);
+    return;
+  }
 
   const codes = getCodes();
   if (!codes[code]) {
-    toastError('كود الطالب غير صحيح');
+    toastError('كود الطالب غير صحيح. للاختبار استخدم: S1001a أو S1003');
     return;
   }
   if (codes[code].isActive) {
-    toastError('هذا الحساب مستخدم حالياً');
+    toastError('هذا الحساب مستخدم حالياً. جرب كود آخر.');
     return;
   }
 
-  // Mark code active and update name
-  codes[code].isActive = true;
-  codes[code].name = name;
-  setCodes(codes);
+  try {
+    // Mark code active and update name
+    codes[code].isActive = true;
+    codes[code].name = name;
+    setCodes(codes);
 
-  const isAdmin = code === 'S1001a';
-  const session = {
-    studentName: isAdmin ? 'باقر أسعد حسين' : name,
-    studentCode: code,
-    section: codes[code].section,
-    canPostHomework: isAdmin ? true : !!codes[code].canPost,
-    isAdmin,
-  };
-  setSession(session);
-  toastSuccess('تم تسجيل الدخول بنجاح!');
-  renderApp();
+    const isAdmin = code === 'S1001a';
+    const session = {
+      studentName: isAdmin ? 'باقر أسعد حسين' : name,
+      studentCode: code,
+      section: codes[code].section,
+      canPostHomework: isAdmin ? true : !!codes[code].canPost,
+      isAdmin,
+    };
+    
+    setSession(session);
+    setAuth(true); // تعيين حالة المصادقة
+    toastSuccess('تم تسجيل الدخول بنجاح!');
+    
+    // مسح النموذج
+    if (studentNameInput) studentNameInput.value = '';
+    if (studentCodeInput) studentCodeInput.value = '';
+    
+    // إعادة تحميل التطبيق
+    await renderApp();
+  } catch (error) {
+    console.error('Login error:', error);
+    toastError('حدث خطأ أثناء تسجيل الدخول');
+  }
 }
+
 
 async function renderApp() {
-  initDatasets();
-  const isLogged = getAuth();
-  const session = getSession();
+  try {
+    // Apply saved theme
+    applyTheme(isDarkMode());
+    
+    // تأكد من وجود عناصر DOM
+    if (!authSection || !studentLoginSection || !dashboardSection) {
+      toastError('خطأ في تحميل عناصر الصفحة');
+      return;
+    }
+    
+    initDatasets();
+    
+    const isLogged = getAuth();
+    const session = getSession();
 
-  // Header button visibility
-  if (isLogged && session) { show(signOutBtn); } else { hide(signOutBtn); }
+    // Header button visibility
+    if (isLogged && session) { 
+      show(signOutBtn);
+    } else { 
+      hide(signOutBtn);
+    }
+    
+    // زر الوضع يظهر دائماً
+    show(themeToggle);
 
+    if (!isLogged) {
+      show(authSection); 
+      hide(studentLoginSection); 
+      hide(dashboardSection);
+      // تعيين الحالة بشكل صحيح
+      setAuth(false);
+      return;
+    }
 
-  if (!isLogged) {
-    show(authSection); hide(studentLoginSection); hide(dashboardSection);
-    return;
+    if (!session) {
+      hide(authSection); show(studentLoginSection); hide(dashboardSection);
+      return;
+    }
+
+    // Render dashboard
+    hide(authSection); hide(studentLoginSection); show(dashboardSection);
+    
+    // تعيين الحالة بشكل صحيح للمستخدم المسجل
+    setAuth(true);
+
+    if (studentNameDisplay) studentNameDisplay.textContent = session.studentName;
+    if (studentSectionDisplay) studentSectionDisplay.textContent = session.section;
+    if (homeworkSectionLabel) homeworkSectionLabel.textContent = session.section;
+
+    // الشارة تظهر فقط للمسؤول
+    if (session.isAdmin) {
+      show(publisherBadge);
+    } else {
+      hide(publisherBadge);
+    }
+
+    // إظهار تبويب الإنشاء لمن يملك النشر (الناشرين والمسؤول)
+    if (session.canPostHomework) {
+      show(createTabBtn);
+    } else {
+      hide(createTabBtn);
+    }
+
+    // عناصر خاصة بالمسؤول
+    if (session.isAdmin) {
+      if (adminAnnouncementFormWrapper) show(adminAnnouncementFormWrapper);
+      const adminSectionSelect = document.getElementById('adminSectionSelect');
+      if (adminSectionSelect) show(adminSectionSelect);
+      if (adminTabsRow) show(adminTabsRow);
+    } else {
+      if (adminAnnouncementFormWrapper) hide(adminAnnouncementFormWrapper);
+      const adminSectionSelect = document.getElementById('adminSectionSelect');
+      if (adminSectionSelect) hide(adminSectionSelect);
+      if (adminTabsRow) hide(adminTabsRow);
+    }
+
+    // Set default tab to homework on first load
+    if (!tabBtns.some(b => b.classList.contains('active'))) {
+      setActiveTab('homework');
+    }
+
+    await renderHomework();
+    await renderArchived();
+    await renderAnnouncements();
+  } catch (error) {
+    console.error('❌ خطأ في renderApp:', error);
+    toastError('حدث خطأ في تحميل التطبيق');
+    
+    // Fallback: show authSection manually if there's an error
+    if (authSection) {
+      authSection.classList.remove('hidden');
+    }
+    if (studentLoginSection) {
+      studentLoginSection.classList.add('hidden');
+    }
+    if (dashboardSection) {
+      dashboardSection.classList.add('hidden');
+    }
   }
-
-  if (!session) {
-    hide(authSection); show(studentLoginSection); hide(dashboardSection);
-    return;
-  }
-
-  // Render dashboard
-  hide(authSection); hide(studentLoginSection); show(dashboardSection);
-
-  studentNameDisplay.textContent = session.studentName;
-  studentSectionDisplay.textContent = session.section;
-  homeworkSectionLabel.textContent = session.section;
-
-  // الشارة تظهر فقط للمسؤول
-  if (session.isAdmin) {
-    show(publisherBadge);
-  } else {
-    hide(publisherBadge);
-  }
-
-  // إظهار تبويب الإنشاء لمن يملك النشر (الناشرين والمسؤول)
-  if (session.canPostHomework) {
-    show(createTabBtn);
-  } else {
-    hide(createTabBtn);
-  }
-
-  // عناصر خاصة بالمسؤول
-  if (session.isAdmin) {
-    if (adminAnnouncementFormWrapper) show(adminAnnouncementFormWrapper);
-    const adminSectionSelect = document.getElementById('adminSectionSelect');
-    if (adminSectionSelect) show(adminSectionSelect);
-    if (adminTabsRow) show(adminTabsRow);
-  } else {
-    if (adminAnnouncementFormWrapper) hide(adminAnnouncementFormWrapper);
-    const adminSectionSelect = document.getElementById('adminSectionSelect');
-    if (adminSectionSelect) hide(adminSectionSelect);
-    if (adminTabsRow) hide(adminTabsRow);
-  }
-
-  // Set default tab to homework on first load
-  if (!tabBtns.some(b => b.classList.contains('active'))) {
-    setActiveTab('homework');
-  }
-
-  await renderHomework();
-  await renderArchived();
-  await renderAnnouncements();
 }
 
-// Event bindings
-if (signInBtn) signInBtn.addEventListener('click', onSignIn);
-if (signOutBtn) signOutBtn.addEventListener('click', onSignOut);
-if (studentLoginForm) studentLoginForm.addEventListener('submit', onStudentLogin);
-if (createHomeworkForm) createHomeworkForm.addEventListener('submit', createHomework);
-if (createAnnouncementForm) createAnnouncementForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const session = getSession();
-  if (!session?.isAdmin) { toastError('صلاحية غير كافية'); return; }
-  const title = (annTitle?.value || '').trim();
-  const body = (annBody?.value || '').trim();
-  if (!title || !body) return;
-  const all = await getAnnouncements();
-  all.unshift({ id: Date.now(), title, body, createdAt: new Date().toISOString(), creator: session.studentName, isArchived: false });
-  await setAnnouncements(all);
-  toastSuccess('تم نشر التبليغ الإداري');
-  if (annTitle) annTitle.value = '';
-  if (annBody) annBody.value = '';
-  await renderAnnouncements();
-});
-
-tabBtns.forEach(btn => btn.addEventListener('click', async () => {
-  const tab = btn.dataset.tab;
-  setActiveTab(tab);
-  if (tab === 'announcements') await renderAnnouncements();
-  if (tab === 'homework') await renderHomework();
-  if (tab === 'archived') await renderArchived();
-  if (tab === 'stats') await renderStats();
-}));
+// Event bindings - إعادة تفعيل الأزرار
+function bindEvents() {
+  try {
+    // إعادة الحصول على العناصر للتأكد
+    const signInButton = document.getElementById('signInBtn');
+    const themeButton = document.getElementById('themeToggle');
+    const signOutButton = document.getElementById('signOutBtn');
+    const loginForm = document.getElementById('studentLoginForm');
+  
+  // زر تسجيل الدخول في الشاشة الأولى
+  if (signInButton) {
+    signInButton.addEventListener('click', function(e) {
+      e.preventDefault();
+      onSignIn();
+    });
+  }
+  
+  // زر تسجيل الخروج
+  if (signOutButton) {
+    signOutButton.addEventListener('click', function(e) {
+      e.preventDefault();
+      onSignOut();
+    });
+  }
+  
+  // زر تبديل الوضع
+  if (themeButton) {
+    themeButton.addEventListener('click', function(e) {
+      e.preventDefault();
+      toggleTheme();
+    });
+  }
+  
+  // نموذج تسجيل دخول الطالب
+  if (loginForm) {
+    loginForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      onStudentLogin(e);
+    });
+  }
+  
+  // نموذج إنشاء واجب
+  if (createHomeworkForm) {
+    createHomeworkForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      createHomework(e);
+    });
+  }
+  
+  // ربط أحداث التبويبات
+  tabBtns.forEach(btn => btn.addEventListener('click', async () => {
+    const tab = btn.dataset.tab;
+    setActiveTab(tab);
+    if (tab === 'announcements') await renderAnnouncements();
+    if (tab === 'homework') await renderHomework();
+    if (tab === 'archived') await renderArchived();
+    if (tab === 'stats') await renderStats();
+  }));
+  
+  // نموذج إنشاء تبليغ
+  if (createAnnouncementForm) {
+    createAnnouncementForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const session = getSession();
+      if (!session?.isAdmin) {
+        toastError('صلاحية غير كافية');
+        return;
+      }
+      
+      const title = sanitizeInput((annTitle?.value || '').trim());
+      const body = sanitizeInput((annBody?.value || '').trim());
+      
+      // Validate form
+      const errors = validateAnnouncementForm(title, body);
+      if (errors.length > 0) {
+        toastError(errors[0]);
+        return;
+      }
+      
+      try {
+        const all = await getAnnouncements();
+        const newAnnouncement = {
+          id: Date.now() + Math.random(),
+          title,
+          body,
+          createdAt: new Date().toISOString(),
+          creator: session.studentName,
+          isArchived: false
+        };
+        
+        all.unshift(newAnnouncement);
+        await setAnnouncements(all);
+        toastSuccess('تم نشر التبليغ الإداري');
+        
+        // Clear form
+        if (annTitle) annTitle.value = '';
+        if (annBody) annBody.value = '';
+        
+        await renderAnnouncements();
+      } catch (error) {
+        console.error('Error creating announcement:', error);
+        toastError('حدث خطأ أثناء نشر التبليغ');
+      }
+    });
+  }
+  
+  // ربط أحداث Modal
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', closeModal);
+  }
+  
+  if (modalOverlay) {
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) closeModal();
+    });
+  }
+  
+  // Keyboard navigation for modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modalOverlay?.classList.contains('hidden')) {
+      closeModal();
+    }
+  });
+  } catch (error) {
+    console.error('❌ خطأ في ربط الأحداث:', error);
+    toastError('حدث خطأ في ربط أحداث الصفحة');
+  }
+}
 
 async function renderAnnouncements() {
   if (!announcementsListEl) return;
   const session = getSession();
-  const isAdmin = !!session?.isAdmin;
+  if (!session) return;
+  const isAdmin = !!session.isAdmin;
   const raw = await getAnnouncements();
   const list = isAdmin ? raw : raw.filter(a => !a.isArchived);
   announcementsListEl.innerHTML = '';
@@ -704,23 +1206,28 @@ async function renderAnnouncements() {
   }
   for (const ann of list) {
     const card = document.createElement('div');
-    card.className = 'bg-white border-2 border-gray-200 rounded-xl p-6 hover:shadow-lg';
+    card.className = 'bg-white border border-gray-200 rounded-lg p-4 transition-all hover:shadow-md hover:border-blue-300';
     card.innerHTML = `
-      <div class="flex items-start justify-between mb-2">
-        <div class="flex items-center gap-2">
-          <h4 class="text-lg font-bold text-gray-800">${ann.title}</h4>
-          ${ann.isArchived ? `<span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">مؤرشف</span>` : ''}
+      <div class="flex items-start justify-between">
+        <!-- المعلومات اليسرى -->
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-2">
+            <h4 class="text-lg font-bold text-gray-800">${ann.title}</h4>
+            ${ann.isArchived ? `<span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">مؤرشف</span>` : ''}
+          </div>
+          <p class="text-gray-600 text-sm mb-2 line-clamp-2">${ann.body}</p>
+          <div class="text-xs text-gray-500">بواسطة: ${ann.creator} • ${new Date(ann.createdAt).toLocaleString()}</div>
         </div>
-        <div class="flex items-center gap-2">
-          <button data-id="${ann.id}" class="zoom-ann-btn px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700">تكبير</button>
+        
+        <!-- الأزرار اليمين -->
+        <div class="flex flex-col gap-2 ml-4">
+          <button data-id="${ann.id}" class="zoom-ann-btn px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-all">تكبير</button>
           ${isAdmin ? `
-            <button data-id="${ann.id}" class="arch-ann px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">${ann.isArchived ? 'إلغاء الأرشفة' : 'أرشفة'}</button>
-            <button data-id="${ann.id}" class="del-ann px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700">حذف</button>
+            <button data-id="${ann.id}" class="arch-ann px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm font-medium hover:bg-gray-300 transition-all">${ann.isArchived ? 'إلغاء' : 'أرشفة'}</button>
+            <button data-id="${ann.id}" class="del-ann px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>
           ` : ''}
         </div>
       </div>
-      <p class="text-gray-700 mb-2">${ann.body}</p>
-      <div class="text-sm text-gray-500">بواسطة: ${ann.creator} • ${new Date(ann.createdAt).toLocaleString()}</div>
     `;
     announcementsListEl.appendChild(card);
   }
@@ -764,6 +1271,8 @@ async function renderAnnouncements() {
 async function renderStats() {
   const statsEl = document.getElementById('statsContent');
   if (!statsEl) return;
+  const session = getSession();
+  if (!session?.isAdmin) return;
   const all = await getHomework();
   const total = all.length;
   const current = all.filter(h => !h.isArchived).length;
@@ -796,7 +1305,6 @@ async function renderStats() {
   `;
 
   const listEl = document.getElementById('statsList');
-  const session = getSession();
   for (const hw of all) {
     const row = document.createElement('div');
     row.className = 'flex flex-wrap items-center justify-between bg-white border-2 border-gray-200 rounded-lg p-3';
@@ -822,9 +1330,41 @@ async function renderStats() {
   });
 }
 
-// Auto-archive timer
-setInterval(checkAndAutoArchive, 60 * 1000);
-checkAndAutoArchive();
+// Initialize app with error handling
+async function initializeApp() {
+  // تأخير قصير للتأكد من تحميل جميع العناصر
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  try {
+    // ربط الأحداث مرة واحدة فقط
+    bindEvents();
+    
+    await renderApp();
+    
+    // Start auto-archive timer
+    setInterval(checkAndAutoArchive, 60 * 1000);
+    await checkAndAutoArchive();
+  } catch (error) {
+    console.error('❌ خطأ في تهيئة التطبيق:', error);
+    toastError('حدث خطأ في تحميل التطبيق');
+    
+    // Fallback: show authSection manually if there's an error
+    if (authSection) {
+      authSection.classList.remove('hidden');
+    }
+    if (studentLoginSection) {
+      studentLoginSection.classList.add('hidden');
+    }
+    if (dashboardSection) {
+      dashboardSection.classList.add('hidden');
+    }
+  }
+}
 
-// Bootstrap
-renderApp();
+// Bootstrap the application after DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+  // DOM already loaded
+  initializeApp();
+}
