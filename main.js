@@ -213,16 +213,56 @@ function formatViews(hw) {
 function openHomeworkDetails(hw) {
   if (!modalOverlay) return;
   modalTitle.textContent = hw.title || '';
-  modalBody.textContent = hw.description || '';
+  
+  // تنسيق خاص للواجبات: المعلومات الفوقية، الواجب، المعلومات الجوة
   if (modalMeta) {
-    const metaParts = [];
-    if (hw.section) metaParts.push(`🏢 شعبة ${hw.section}`);
-    if (hw.dueDay) metaParts.push(`📅 ليوم ${hw.dueDay}`);
-    if (hw.viewsCount || hw.viewsCount === 0) metaParts.push(`👁 ${formatViews(hw)}`);
-    if (hw.creatorName) metaParts.push(`👤 بواسطة: ${hw.creatorName}`);
-    if (hw.isArchived) metaParts.push(`📋 مؤرشف`);
+    // المعلومات الفوقية
+    const topInfo = [];
+    if (hw.section) topInfo.push(`🏢 الشعبة: ${hw.section}`);
+    if (hw.dueDay) topInfo.push(`📅 موعد التسليم: ${hw.dueDay}`);
+    
+    // المعلومات الجوة (السفلية)
+    const bottomInfo = [];
+    if (hw.viewsCount || hw.viewsCount === 0) bottomInfo.push(`👁 ${formatViews(hw)}`);
+    if (hw.creatorName) bottomInfo.push(`👤 بواسطة: ${hw.creatorName}`);
+    if (hw.isArchived) bottomInfo.push(`📋 مؤرشف`);
     if (hw.createdAt) {
       const createdDate = new Date(hw.createdAt);
+      bottomInfo.push(`🕰 أنشئ في: ${createdDate.toLocaleString('ar-EG')}`);
+    }
+    
+    // ترتيب العرض: معلومات علوية + مسافات + واجب + مسافات + معلومات جوة
+    let modalContent = '';
+    
+    if (topInfo.length > 0) {
+      modalContent += `<div class="top-modal-info mb-4">${topInfo.join(' • ')}</div>`;
+      modalContent += `<hr class="my-4 border-gray-200">`; // سطرين
+    }
+    
+    modalContent += `<div class="homework-content mb-4"><strong class="text-lg">${hw.title}</strong></div>`;
+    
+    if (bottomInfo.length > 0) {
+      modalContent += `<hr class="my-4 border-gray-200">`; // سطرين
+      modalContent += `<div class="bottom-modal-info">${bottomInfo.join(' • ')}</div>`;
+    }
+    
+    modalMeta.innerHTML = modalContent;
+  }
+  
+  modalBody.textContent = hw.description || '';
+  modalOverlay.classList.remove('hidden');
+}
+
+function openAnnouncementDetails(ann) {
+  if (!modalOverlay) return;
+  modalTitle.textContent = ann.title || '';
+  modalBody.textContent = ann.body || '';
+  if (modalMeta) {
+    const metaParts = [];
+    if (ann.creator) metaParts.push(`👤 بواسطة: ${ann.creator}`);
+    if (ann.isArchived) metaParts.push(`📋 مؤرشف`);
+    if (ann.createdAt) {
+      const createdDate = new Date(ann.createdAt);
       metaParts.push(`🕰 أنشئ في: ${createdDate.toLocaleString('ar-EG')}`);
     }
     modalMeta.innerHTML = metaParts.join('<br>');
@@ -316,19 +356,28 @@ async function renderHomework() {
     const card = document.createElement('div');
     card.className = 'bg-white border-2 border-gray-200 rounded-xl p-6 transition-all hover:shadow-lg hover:border-blue-300';
     card.innerHTML = `
-      <div class="flex items-start justify-between mb-4">
-        <div class="flex-1">
-          <h3 class="text-xl font-bold text-gray-800 mb-2">${hw.title}</h3>
-          <div class="space-y-1 mb-3">
-            ${hw.dueDay ? `<p class="text-sm text-orange-600">📅 ليوم ${hw.dueDay}</p>` : ''}
-            <p class="text-sm text-gray-500">👁 ${formatViews(hw)}</p>
-            ${hw.creatorName ? `<p class="text-xs text-gray-400">بواسطة: ${hw.creatorName}</p>` : ''}
-          </div>
+      <div class="homework-card-layout">
+        <!-- المعلومات العلوية -->
+        <div class="top-info space-y-1 mb-4">
+          ${hw.dueDay ? `<p class="text-sm text-orange-600 font-medium">📅 موعد التسليم: ${hw.dueDay}</p>` : ''}
+          ${hw.creatorName ? `<p class="text-sm text-blue-600">👤 بواسطة: ${hw.creatorName}</p>` : ''}
         </div>
-        <div class="flex flex-col gap-2">
-          <button data-id="${hw.id}" class="zoom-btn px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-all hover:bg-blue-700">تكبير</button>
-          ${canArchive ? `<button data-id="${hw.id}" class="archive-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium transition-all hover:bg-red-600 hover:text-white">أرشفة</button>` : ''}
-          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition-all hover:bg-red-700">حذف</button>` : ''}
+        
+        <!-- الواجب (العنوان) -->
+        <div class="homework-title mb-4">
+          <h3 class="text-xl font-bold text-gray-800 text-center py-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">${hw.title}</h3>
+        </div>
+        
+        <!-- المعلومات السفلية -->
+        <div class="bottom-info flex items-center justify-between">
+          <div class="info-left">
+            <p class="text-sm text-gray-500">👁 ${formatViews(hw)}</p>
+          </div>
+          <div class="action-buttons flex gap-2">
+            <button data-id="${hw.id}" class="zoom-btn px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-all hover:bg-blue-700">تكبير</button>
+            ${canArchive ? `<button data-id="${hw.id}" class="archive-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium transition-all hover:bg-red-600 hover:text-white">أرشفة</button>` : ''}
+            ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition-all hover:bg-red-700">حذف</button>` : ''}
+          </div>
         </div>
       </div>`;
     homeworkListEl.appendChild(card);
@@ -662,18 +711,31 @@ async function renderAnnouncements() {
           <h4 class="text-lg font-bold text-gray-800">${ann.title}</h4>
           ${ann.isArchived ? `<span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">مؤرشف</span>` : ''}
         </div>
-        ${isAdmin ? `
-          <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2">
+          <button data-id="${ann.id}" class="zoom-ann-btn px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700">تكبير</button>
+          ${isAdmin ? `
             <button data-id="${ann.id}" class="arch-ann px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">${ann.isArchived ? 'إلغاء الأرشفة' : 'أرشفة'}</button>
             <button data-id="${ann.id}" class="del-ann px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700">حذف</button>
-          </div>
-        ` : ''}
+          ` : ''}
+        </div>
       </div>
       <p class="text-gray-700 mb-2">${ann.body}</p>
       <div class="text-sm text-gray-500">بواسطة: ${ann.creator} • ${new Date(ann.createdAt).toLocaleString()}</div>
     `;
     announcementsListEl.appendChild(card);
   }
+  
+  // Zoom announcements event listeners
+  announcementsListEl.querySelectorAll('.zoom-ann-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const all = await getAnnouncements();
+      const ann = all.find(a => String(a.id) === String(id));
+      if (!ann) return;
+      openAnnouncementDetails(ann);
+    });
+  });
+  
   announcementsListEl.querySelectorAll('.arch-ann').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id');

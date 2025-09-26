@@ -304,3 +304,39 @@ body {
     padding-right: max(1rem, env(safe-area-inset-right));
   }
 }
+
+/* Homework card layout improvements */
+.homework-card-layout {
+  padding: 1.5rem;
+}
+
+.homework-title h3 {
+  font-weight: bold;
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+
+.top-info, .bottom-info {
+  margin: 0.75rem 0;
+}
+
+/* Modal content spacing */
+.top-modal-info, .bottom-modal-info {
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.homework-content strong {
+  font-weight: bold;
+  color: #1f2937;
+  display: block;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+/* Better button spacing for announcements */
+.zoom-ann-btn {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
