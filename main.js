@@ -557,7 +557,7 @@ async function renderHomework() {
         <div class="flex flex-col gap-2 ml-4">
           <button data-id="${hw.id}" class="zoom-btn px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-all">تكبير</button>
           ${canArchive ? `<button data-id="${hw.id}" class="archive-btn px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm font-medium hover:bg-red-600 hover:text-white transition-all">أرشفة</button>` : ''}
-          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>` : ''}
+          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-3 py-1 bg-red-600 text-black rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>` : ''}
         </div>
       </div>`;
     homeworkListEl.appendChild(card);
@@ -625,7 +625,7 @@ async function renderArchived() {
         </div>
         <div class="flex flex-col gap-2">
           <button data-id="${hw.id}" class="zoom-btn px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-all hover:bg-blue-700">تكبير</button>
-          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition-all hover:bg-red-700">حذف</button>` : ''}
+          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-4 py-2 bg-red-600 text-black rounded-lg font-medium transition-all hover:bg-red-700">حذف</button>` : ''}
         </div>
       </div>`;
     archivedListEl.appendChild(card);
@@ -915,7 +915,7 @@ async function onStudentLogin(e) {
 
   const codes = getCodes();
   if (!codes[code]) {
-    toastError('كود الطالب غير صحيح. للاختبار استخدم: S1001a أو S1003');
+    toastError('كود الطالب غير صحيح.');
     return;
   }
   if (codes[code].isActive) {
@@ -1224,7 +1224,7 @@ async function renderAnnouncements() {
           <button data-id="${ann.id}" class="zoom-ann-btn px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-all">تكبير</button>
           ${isAdmin ? `
             <button data-id="${ann.id}" class="arch-ann px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm font-medium hover:bg-gray-300 transition-all">${ann.isArchived ? 'إلغاء' : 'أرشفة'}</button>
-            <button data-id="${ann.id}" class="del-ann px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>
+            <button data-id="${ann.id}" class="del-ann px-3 py-1 bg-red-600 text-black rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>
           ` : ''}
         </div>
       </div>
@@ -1315,7 +1315,7 @@ async function renderStats() {
       </div>
       <div class="flex items-center gap-4">
         <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-full">👁 ${hw.viewsCount || 0}</span>
-        <button data-id="${hw.id}" class="stats-del px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700">حذف</button>
+        <button data-id="${hw.id}" class="stats-del px-3 py-1 bg-red-600 text-black rounded-lg hover:bg-red-700">حذف</button>
       </div>
     `;
     listEl.appendChild(row);
