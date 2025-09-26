@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>ثانوية الوائلي للمتميزين - واجبات الثالث متوسط</title>
+
+    <link rel="stylesheet" href="./tailwind.css" />
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./fonts/noto-local.css" />
+  </head>
+  <body class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 font-arabic text-gray-800">
+    <!-- App Root -->
+    <div id="app" class="min-h-screen">
+      <!-- Header -->
+      <header class="bg-white/90 backdrop-blur-sm shadow-lg border-b-2 border-blue-100">
+        <div class="container mx-auto px-4 py-6">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4 space-x-reverse">
+              <div class="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                <span class="text-white font-bold text-2xl">📚</span>
+              </div>
+              <div>
+                <h1 class="text-3xl font-bold text-gray-800">ثانوية الوائلي للمتميزين</h1>
+                <p class="text-lg text-blue-600 font-semibold">موقع واجبات الثالث متوسط</p>
+              </div>
+            </div>
+            <button id="signOutBtn" class="hidden px-4 py-2 rounded bg-white text-red-600 border border-red-200 font-semibold hover:bg-red-50 hover:text-red-700 transition-colors shadow-sm hover:shadow">
+              تسجيل خروج
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="container mx-auto px-4 py-8">
+        <!-- Auth Section (anonymous sign-in simulation) -->
+        <section id="authSection" class="hidden">
+          <div class="max-w-md mx-auto text-center animate-fade-in">
+            <div class="w-24 h-24 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span class="text-white font-bold text-3xl">📖</span>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">مرحباً بك</h2>
+            <p class="text-gray-600 mb-8">سجل دخولك للوصول إلى واجبات الثالث متوسط</p>
+            <button id="signInBtn" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+              تسجيل الدخول
+            </button>
+          </div>
+        </section>
+
+        <!-- Student Login Section -->
+        <section id="studentLoginSection" class="hidden">
+          <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 animate-fade-in">
+              <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span class="text-white font-bold text-2xl">🎓</span>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">تسجيل دخول الطالب</h2>
+                <p class="text-gray-600">أدخل اسمك وكود الطالب الخاص بك</p>
+              </div>
+
+              <form id="studentLoginForm" class="space-y-6">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">اسم الطالب</label>
+                  <input type="text" id="studentName" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="أدخل اسمك الكامل" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">الكود</label>
+                  <input type="text" id="studentCode" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="أدخل كود الطالب الخاص بك" />
+                  <p class="text-xs text-gray-500 mt-1">استخدم الكود المعطى لك من قبل المدرسة</p>
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105">
+                  تسجيل الدخول
+                </button>
+              </form>
+
+              <div class="mt-8 pt-6 border-t border-gray-200">
+                <div class="bg-blue-50 rounded-lg p-4">
+                  <h4 class="font-semibold text-blue-800 mb-2">ملاحظة مهمة:</h4>
+                  <p class="text-blue-700 text-sm">
+                    • كل طالب له كود خاص به<br>
+                    • إذا كان الكود مستخدم حالياً، لن تتمكن من الدخول (محلياً على هذا الجهاز فقط)<br>
+                    • عند تسجيل الخروج، يصبح الكود متاحاً للاستخدام مرة أخرى
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="dashboardSection" class="hidden">
+          <div class="space-y-6">
+            <!-- Welcome Card -->
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-2xl font-bold mb-2">مرحباً <span id="studentNameDisplay"></span></h2>
+                  <p class="text-blue-100">الثالث متوسط - شعبة <span id="studentSectionDisplay"></span></p>
+                  <span id="publisherBadge" class="hidden inline-block bg-white/20 text-white px-3 py-1 rounded-full text-sm mt-2">مسؤول</span>
+                </div>
+                <div class="text-6xl opacity-20">🎓</div>
+              </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+              <!-- First row of tabs (always visible) -->
+              <div class="flex border-b border-gray-100">
+                <button data-tab="homework" class="flex-1 px-6 py-4 text-center font-medium transition-all tab-btn">📚 الواجبات الحالية</button>
+                <button data-tab="archived" class="flex-1 px-6 py-4 text-center font-medium transition-all tab-btn">📋 الواجبات القديمة</button>
+                <button data-tab="announcements" class="flex-1 px-6 py-4 text-center font-medium transition-all tab-btn">📢 التبليغات</button>
+              </div>
+              <!-- Second row of tabs (for admin only) -->
+              <div id="adminTabsRow" class="hidden flex border-b border-gray-100">
+                <button data-tab="stats" id="statsTabBtn" class="flex-1 px-6 py-4 text-center font-medium transition-all tab-btn">📈 الإحصائيات</button>
+                <button data-tab="create" id="createTabBtn" class="flex-1 px-6 py-4 text-center font-medium transition-all tab-btn">✏️ إنشاء واجب</button>
+              </div>
+
+              <div class="p-6">
+                <!-- Homework List -->
+                <div id="tab-homework" class="tab-panel hidden">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">الواجبات الحالية</h3>
+                    <span class="text-sm text-gray-500">شعبة <span id="homeworkSectionLabel"></span></span>
+                  </div>
+                  <div id="homeworkList" class="space-y-4"></div>
+                </div>
+
+                <!-- Archived Homework -->
+                <div id="tab-archived" class="tab-panel hidden">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">الواجبات القديمة</h3>
+                    <span class="text-sm text-gray-500">الواجبات المؤرشفة</span>
+                  </div>
+                  <div id="archivedList" class="space-y-4"></div>
+                </div>
+
+                <!-- Statistics (Admin only) -->
+                <div id="tab-stats" class="tab-panel hidden">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">إحصائيات الواجبات</h3>
+                    <span class="text-sm text-gray-500">عرض شامل للمشاهدات والواجبات</span>
+                  </div>
+                  <div id="statsContent" class="space-y-4"></div>
+                </div>
+
+                <!-- Administrative Announcements -->
+                <div id="tab-announcements" class="tab-panel hidden">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">التبليغات الإدارية</h3>
+                    <span class="text-sm text-gray-500">إشعارات وتعليمات من الإدارة</span>
+                  </div>
+
+                  <div id="adminAnnouncementFormWrapper" class="hidden mb-6">
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-4">
+                      <h4 class="text-lg font-bold text-gray-800 mb-1">إنشاء تبليغ إداري</h4>
+                      <p class="text-gray-600 text-sm">مسؤول الموقع فقط يمكنه النشر والحذف</p>
+                    </div>
+                    <form id="createAnnouncementForm" class="space-y-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">عنوان التبليغ</label>
+                        <input type="text" id="annTitle" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="أدخل عنوان التبليغ"/>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">نص التبليغ</label>
+                        <textarea id="annBody" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none" placeholder="اكتب نص التبليغ"></textarea>
+                      </div>
+                      <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all">نشر التبليغ</button>
+                    </form>
+                  </div>
+
+                  <div id="announcementsList" class="space-y-4"></div>
+                </div>
+                
+                <!-- Create Homework -->
+                <div id="tab-create" class="tab-panel hidden">
+                  <div class="max-w-2xl mx-auto">
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+                      <h2 class="text-2xl font-bold text-gray-800 mb-2">إنشاء واجب جديد</h2>
+                      <p class="text-gray-600">قم بإنشاء واجب جديد لطلاب الشعبة الحالية</p>
+                    </div>
+
+                    <form id="createHomeworkForm" class="space-y-6">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">عنوان الواجب</label>
+                        <input type="text" id="hwTitle" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="أدخل عنوان الواجب"/>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">تفاصيل الواجب</label>
+                        <textarea id="hwDescription" rows="4" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none" placeholder="اكتب تفاصيل الواجب والمطلوب من الطلاب"></textarea>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">الواجب ليوم</label>
+                        <select id="hwDueDay" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                          <option value="" disabled selected>اختر اليوم</option>
+                          <option value="الأحد">الأحد</option>
+                          <option value="الاثنين">الاثنين</option>
+                          <option value="الثلاثاء">الثلاثاء</option>
+                          <option value="الأربعاء">الأربعاء</option>
+                          <option value="الخميس">الخميس</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">إذا كان الواجب ليوم الأحد فسيُؤرشف تلقائياً يوم السبت الساعة 11:59 ليلاً</p>
+                      </div>
+                      <div id="adminSectionSelect" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">الشعبة</label>
+                        <select id="hwSectionAdmin" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                          <option value="">اختر الشعبة للنشر</option>
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">متاح لمسؤول الموقع فقط للنشر إلى أي شعبة</p>
+                      </div>
+                      <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105">
+                        إنشاء الواجب
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Modal (Zoom Homework) -->
+      <div id="modalOverlay" class="modal-overlay hidden">
+        <div class="modal-card animate-fade-in">
+          <button id="modalCloseBtn" class="absolute top-3 left-3 px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">إغلاق ✖</button>
+          <h3 id="modalTitle" class="text-2xl font-bold text-gray-800 mb-3"></h3>
+          <p id="modalBody" class="text-gray-700 leading-relaxed pre-wrap"></p>
+          <div id="modalMeta" class="mt-4 text-sm text-gray-500"></div>
+        </div>
+      </div>
+
+      <!-- Toaster -->
+      <div id="toaster" class="fixed top-4 right-4 space-y-2 z-50"></div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
