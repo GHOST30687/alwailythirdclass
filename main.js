@@ -6,6 +6,7 @@ const JSONBIN_CONFIG = {
   API_KEY: (typeof process !== 'undefined' && process.env?.JSONBIN_API_KEY) || '$2a$10$fuuDWFJZi.HrgUohTmYJced2J.i2oUiPYpNMzGax/x/MK3CM31EZu', // 🔑 يُفضل استخدام متغير البيئة
   HOMEWORK_BIN: (typeof process !== 'undefined' && process.env?.HOMEWORK_BIN) || '68d66c19d0ea881f408bb3b3', // 📚 يُفضل استخدام متغير البيئة
   ANNOUNCEMENTS_BIN: (typeof process !== 'undefined' && process.env?.ANNOUNCEMENTS_BIN) || '68d66c3143b1c97be950c256', // 📢 يُفضل استخدام متغير البيئة
+  CODES_BIN: (typeof process !== 'undefined' && process.env?.CODES_BIN) || '68dbee59d0ea881f4090882b', // 🧩 ضع معرف Bin الخاص بالأكواد هنا
   BASE_URL: 'https://api.jsonbin.io/v3/b'
 };
 
@@ -184,63 +185,8 @@ function initDatasets() {
     setJSON(LS_KEYS.CODES, copy);
   }
   
-  // إضافة واجبات تجريبية إذا لم توجد
-  if (!getJSON(LS_KEYS.HOMEWORK, null) || getJSON(LS_KEYS.HOMEWORK, []).length === 0) {
-    const sampleHomework = [
-      {
-        id: Date.now() + 1,
-        title: 'واجب الرياضيات - الفصل الثالث',
-        description: 'حل التمارين من صفحة 45 إلى صفحة 50\n\nيجب كتابة الحلول بخط واضح\nمع تفسير طريقة الحل',
-        dueDay: 'الأحد',
-        section: '1',
-        createdByCode: 'S1001a',
-        creatorName: 'باقر أسعد حسين',
-        isArchived: false,
-        createdAt: new Date().toISOString(),
-        archiveAt: computeArchiveAt('الأحد', new Date().toISOString()),
-        viewsCount: 5,
-        viewers: ['S1003', 'S1004']
-      },
-      {
-        id: Date.now() + 2,
-        title: 'واجب الفيزياء - قوانين الحركة',
-        description: 'دراسة الفصل الخامس من الكتاب\n\nحل المسائل من 1 إلى 10\n\nكتابة تقرير صفحة واحدة عن قوانين نيوتن',
-        dueDay: 'الاثنين',
-        section: '1',
-        createdByCode: 'S1002a',
-        creatorName: 'محمد علي',
-        isArchived: false,
-        createdAt: new Date().toISOString(),
-        archiveAt: computeArchiveAt('الاثنين', new Date().toISOString()),
-        viewsCount: 3,
-        viewers: ['S1003']
-      }
-    ];
-    setJSON(LS_KEYS.HOMEWORK, sampleHomework);
-  }
-  
-  // إضافة تبليغات تجريبية إذا لم توجد
-  if (!getJSON(LS_KEYS.ANNOUNCEMENTS, null) || getJSON(LS_KEYS.ANNOUNCEMENTS, []).length === 0) {
-    const sampleAnnouncements = [
-      {
-        id: Date.now() + 10,
-        title: 'إعلان مهم - امتحانات الفصل الثاني',
-        body: 'تبدأ امتحانات الفصل الثاني يوم الأحد القادم\n\nيرجى من جميع الطلاب الاستعداد جيداً\n\nجدول الامتحانات معلق في الإدارة',
-        creator: 'إدارة المدرسة',
-        createdAt: new Date().toISOString(),
-        isArchived: false
-      },
-      {
-        id: Date.now() + 11,
-        title: 'تنبيه - مواعيد الحضور',
-        body: 'يرجى من جميع الطلاب الالتزام بمواعيد الحضور\n\nبداية الدوام الساعة 8:00 صباحاً\n\nعدم التأخير أكثر من 15 دقيقة',
-        creator: 'قسم الإرشاد',
-        createdAt: new Date().toISOString(),
-        isArchived: false
-      }
-    ];
-    setJSON(LS_KEYS.ANNOUNCEMENTS, sampleAnnouncements);
-  }
+
+
 }
 
 // State
@@ -252,6 +198,119 @@ function clearSession() { localStorage.removeItem(LS_KEYS.SESSION); }
 
 function getCodes() { return getJSON(LS_KEYS.CODES, {}); }
 function setCodes(c) { setJSON(LS_KEYS.CODES, c); }
+
+// Central codes + locking via JSONBin
+const LOCK_TTL_MS = 120000; // مدة صلاحية القفل 2 دقيقة
+const HEARTBEAT_INTERVAL_MS = 30000; // نبض كل 30 ثانية
+let heartbeatTimer = null;
+
+function nowIso() { return new Date().toISOString(); }
+function generateSessionId() {
+  return 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+async function getCodesCentral() {
+  if (!JSONBIN_CONFIG.CODES_BIN) return null;
+  const record = await fetchFromBin(JSONBIN_CONFIG.CODES_BIN);
+  if (!record) return null;
+  // دعم شكلين: {codes, locks} أو كائن الأكواد مباشرة
+  if (record.codes) return { codes: record.codes, locks: record.locks || {} };
+  return { codes: record, locks: record.locks || {} };
+}
+
+async function setCodesCentral(updater) {
+  if (!JSONBIN_CONFIG.CODES_BIN) return false;
+  let data;
+  if (typeof updater === 'function') {
+    const current = await getCodesCentral();
+    const base = current || { codes: getCodes(), locks: {} };
+    data = await updater(base);
+  } else {
+    data = updater;
+  }
+  return saveToBin(JSONBIN_CONFIG.CODES_BIN, data);
+}
+
+function isLockActive(lock) {
+  if (!lock) return false;
+  const expiresAt = new Date(lock.expiresAt).getTime();
+  return Date.now() < expiresAt;
+}
+
+async function acquireCodeLock(code, session) {
+  if (!JSONBIN_CONFIG.CODES_BIN) return { ok: true, offline: true };
+  const current = await getCodesCentral();
+  const data = current || { codes: getCodes(), locks: {} };
+  if (!data.codes || !data.codes[code]) {
+    return { ok: false, error: 'كود الطالب غير صحيح' };
+  }
+  const existing = data.locks?.[code];
+  if (existing && isLockActive(existing) && existing.sessionId !== session.sessionId) {
+    return { ok: false, error: 'هذا الحساب مستخدم حالياً. جرب كود آخر.' };
+  }
+  const lock = {
+    sessionId: session.sessionId,
+    studentName: session.studentName,
+    lockedAt: nowIso(),
+    heartbeatAt: nowIso(),
+    expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
+  };
+  data.locks = data.locks || {};
+  data.locks[code] = lock;
+  const ok = await saveToBin(JSONBIN_CONFIG.CODES_BIN, data);
+  if (!ok) return { ok: false, error: 'تعذر تأمين الكود مركزياً' };
+  return { ok: true };
+}
+
+async function releaseCodeLock(code, sessionId) {
+  if (!JSONBIN_CONFIG.CODES_BIN) return true;
+  const current = await getCodesCentral();
+  if (!current || !current.locks) return true;
+  const lock = current.locks[code];
+  if (lock && lock.sessionId && lock.sessionId !== sessionId) {
+    return true; // عدم إزالة قفل مستخدم آخر
+  }
+  delete current.locks[code];
+  return saveToBin(JSONBIN_CONFIG.CODES_BIN, current);
+}
+
+async function heartbeat(code, sessionId) {
+  if (!JSONBIN_CONFIG.CODES_BIN) return true;
+  const current = await getCodesCentral();
+  if (!current) return false;
+  current.locks = current.locks || {};
+  const lock = current.locks[code];
+  if (lock && lock.sessionId === sessionId) {
+    lock.heartbeatAt = nowIso();
+    lock.expiresAt = new Date(Date.now() + LOCK_TTL_MS).toISOString();
+    return saveToBin(JSONBIN_CONFIG.CODES_BIN, current);
+  }
+  return false;
+}
+
+function startHeartbeat() {
+  const session = getSession();
+  if (!session) return;
+  stopHeartbeat();
+  heartbeatTimer = setInterval(() => {
+    heartbeat(session.studentCode, session.sessionId).catch(err => console.warn('Heartbeat failed:', err?.message || err));
+  }, HEARTBEAT_INTERVAL_MS);
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+window.addEventListener('beforeunload', () => {
+  const session = getSession();
+  if (session) {
+    // أفضل جهد لتحرير القفل قبل الإغلاق
+    releaseCodeLock(session.studentCode, session.sessionId);
+  }
+});
 
 // JSONBin functions for homework and announcements
 async function getHomework() {
@@ -557,7 +616,7 @@ async function renderHomework() {
         <div class="flex flex-col gap-2 ml-4">
           <button data-id="${hw.id}" class="zoom-btn px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-all">تكبير</button>
           ${canArchive ? `<button data-id="${hw.id}" class="archive-btn px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm font-medium hover:bg-red-600 hover:text-white transition-all">أرشفة</button>` : ''}
-          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-3 py-1 bg-red-600 text-black rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>` : ''}
+          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>` : ''}
         </div>
       </div>`;
     homeworkListEl.appendChild(card);
@@ -625,7 +684,7 @@ async function renderArchived() {
         </div>
         <div class="flex flex-col gap-2">
           <button data-id="${hw.id}" class="zoom-btn px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-all hover:bg-blue-700">تكبير</button>
-          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-4 py-2 bg-red-600 text-black rounded-lg font-medium transition-all hover:bg-red-700">حذف</button>` : ''}
+          ${canDelete ? `<button data-id="${hw.id}" class="delete-btn px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition-all hover:bg-red-700">حذف</button>` : ''}
         </div>
       </div>`;
     archivedListEl.appendChild(card);
@@ -875,14 +934,22 @@ function onSignIn() {
   toastSuccess('مرحباً بك! أدخل بياناتك');
 }
 
-function onSignOut() {
+async function onSignOut() {
   const session = getSession();
-  if (session) {
-    const codes = getCodes();
-    if (codes[session.studentCode]) {
-      codes[session.studentCode].isActive = false;
-      setCodes(codes);
+  try {
+    if (session) {
+      // تحرير القفل المركزي إن وُجد
+      await releaseCodeLock(session.studentCode, session.sessionId);
+      stopHeartbeat();
+      // تحديث الحالة محلياً كأفضل جهد
+      const codes = getCodes();
+      if (codes[session.studentCode]) {
+        codes[session.studentCode].isActive = false;
+        setCodes(codes);
+      }
     }
+  } catch (e) {
+    console.warn('Sign out cleanup failed:', e?.message || e);
   }
   clearSession();
   setAuth(false);
@@ -913,39 +980,74 @@ async function onStudentLogin(e) {
     return;
   }
 
-  const codes = getCodes();
-  if (!codes[code]) {
-    toastError('كود الطالب غير صحيح.');
-    return;
-  }
-  if (codes[code].isActive) {
-    toastError('هذا الحساب مستخدم حالياً. جرب كود آخر.');
-    return;
-  }
+  const useCentral = !!JSONBIN_CONFIG.CODES_BIN;
 
   try {
-    // Mark code active and update name
-    codes[code].isActive = true;
-    codes[code].name = name;
-    setCodes(codes);
+    // Load codes map (central first, fallback to local)
+    let codesMap;
+    let central;
+    if (useCentral) {
+      central = await getCodesCentral();
+      codesMap = central?.codes || getCodes();
+    } else {
+      codesMap = getCodes();
+    }
 
-    const isAdmin = code === 'S1001a';
+    if (!codesMap[code]) {
+      toastError('كود الطالب غير صحيح, الرجاء التحقق من الكود');
+      return;
+    }
+
+    const isAdmin = code === 'baqermanee';
+    if (isAdmin) {
+      const requiredName = 'باقر أسعد حسين';
+      if (name !== requiredName) {
+        toastError('الحساب هو للأدمن فقط');
+        return;
+      }
+    }
+
+    // If no central locking, enforce local lock check
+    if (!useCentral) {
+      if (codesMap[code].isActive) {
+        toastError('هذا الحساب مستخدم حالياً. جرب كود آخر.');
+        return;
+      }
+    }
+
     const session = {
       studentName: isAdmin ? 'باقر أسعد حسين' : name,
       studentCode: code,
-      section: codes[code].section,
-      canPostHomework: isAdmin ? true : !!codes[code].canPost,
+      section: codesMap[code].section,
+      canPostHomework: isAdmin ? true : !!codesMap[code].canPost,
       isAdmin,
+      sessionId: generateSessionId(),
     };
-    
+
+    if (useCentral) {
+      const res = await acquireCodeLock(code, session);
+      if (!res.ok) {
+        toastError(res.error || 'تعذر تأمين الكود مركزياً');
+        return;
+      }
+    } else {
+      // Local-only: mark active
+      codesMap[code].isActive = true;
+      codesMap[code].name = name;
+      setCodes(codesMap);
+    }
+
     setSession(session);
     setAuth(true); // تعيين حالة المصادقة
     toastSuccess('تم تسجيل الدخول بنجاح!');
-    
+
     // مسح النموذج
     if (studentNameInput) studentNameInput.value = '';
     if (studentCodeInput) studentCodeInput.value = '';
-    
+
+    // ابدأ النبض لتجديد القفل
+    startHeartbeat();
+
     // إعادة تحميل التطبيق
     await renderApp();
   } catch (error) {
@@ -998,10 +1100,12 @@ async function renderApp() {
     // Render dashboard
     hide(authSection); hide(studentLoginSection); show(dashboardSection);
     
-    // تعيين الحالة بشكل صحيح للمستخدم المسجل
-    setAuth(true);
+  // تعيين الحالة بشكل صحيح للمستخدم المسجل
+  setAuth(true);
+  // ابدأ نبض الجلسة لتجديد القفل المركزي عند وجود جلسة محفوظة
+  startHeartbeat();
 
-    if (studentNameDisplay) studentNameDisplay.textContent = session.studentName;
+  if (studentNameDisplay) studentNameDisplay.textContent = session.studentName;
     if (studentSectionDisplay) studentSectionDisplay.textContent = session.section;
     if (homeworkSectionLabel) homeworkSectionLabel.textContent = session.section;
 
@@ -1224,7 +1328,7 @@ async function renderAnnouncements() {
           <button data-id="${ann.id}" class="zoom-ann-btn px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-all">تكبير</button>
           ${isAdmin ? `
             <button data-id="${ann.id}" class="arch-ann px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm font-medium hover:bg-gray-300 transition-all">${ann.isArchived ? 'إلغاء' : 'أرشفة'}</button>
-            <button data-id="${ann.id}" class="del-ann px-3 py-1 bg-red-600 text-black rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>
+            <button data-id="${ann.id}" class="del-ann px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-all">حذف</button>
           ` : ''}
         </div>
       </div>
@@ -1315,7 +1419,7 @@ async function renderStats() {
       </div>
       <div class="flex items-center gap-4">
         <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-full">👁 ${hw.viewsCount || 0}</span>
-        <button data-id="${hw.id}" class="stats-del px-3 py-1 bg-red-600 text-black rounded-lg hover:bg-red-700">حذف</button>
+        <button data-id="${hw.id}" class="stats-del px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700">حذف</button>
       </div>
     `;
     listEl.appendChild(row);

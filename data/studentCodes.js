@@ -1,6 +1,6 @@
 export const STUDENT_CODES = {
   // Section 1
-  "S1001a": { name: "", section: "1", canPost: true, isActive: false },
+  "baqermanee": { name: "", section: "1", canPost: true, isActive: false },
   "S1002a": { name: "", section: "1", canPost: true, isActive: false },
   "S1003": { name: "", section: "1", canPost: false, isActive: false },
   "S1004": { name: "", section: "1", canPost: false, isActive: false },

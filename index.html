@@ -34,7 +34,7 @@
             </div>
             <div class="flex items-center gap-2">
               <!-- Theme Toggle Button -->
-              <button id="themeToggle" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 border border-gray-200 font-semibold hover:bg-gray-200 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" aria-label="تبديل الوضع المظلم/الفاتح" title="تبديل الوضع المظلم/الفاتح">
+<button id="themeToggle" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 border border-gray-200 font-semibold hover:bg-gray-200 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" aria-label="تبديل الوضع المظلم/الفاتح" aria-pressed="false" title="تبديل الوضع المظلم/الفاتح">
                 <span id="themeIcon">🌙</span>
               </button>
               
@@ -253,7 +253,7 @@
       </div>
 
       <!-- Toaster -->
-      <div id="toaster" class="fixed top-4 right-4 space-y-2 z-50"></div>
+      <div id="toaster" class="fixed top-4 right-4 space-y-2 z-50" role="status" aria-live="polite"></div>
       
       <!-- Simple Loading Spinner (Hidden by default) -->
       <div id="simpleLoader" class="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center hidden">
