@@ -3,7 +3,7 @@ import { STUDENT_CODES } from './data/studentCodes.js';
 // ⚠️ JSONBin.io Configuration - يجب نقل هذه المعلومات إلى متغيرات البيئة في بيئة الإنتاج
 // في بيئة المتصفح، لا يمكن استخدام process.env مباشرة، لذلك نستخدم القيم الافتراضية
 const JSONBIN_CONFIG = {
-  API_KEY: (typeof process !== 'undefined' && process.env?.JSONBIN_API_KEY) || '$2a$10$fuuDWFJZi.HrgUohTmYJced2J.i2oUiPYpNMzGax/x/MK3CM31EZu', // 🔑 يُفضل استخدام متغير البيئة
+  API_KEY: (typeof process !== 'undefined' && process.env?.JSONBIN_API_KEY) || '$2a$10$cp2Iez6m4n5Kz6mx2uXg8ukO5.UmSmZXW5wyd5u7zAN0tmCTck6zi', // 🔑 يُفضل استخدام متغير البيئة
   HOMEWORK_BIN: (typeof process !== 'undefined' && process.env?.HOMEWORK_BIN) || '68d66c19d0ea881f408bb3b3', // 📚 يُفضل استخدام متغير البيئة
   ANNOUNCEMENTS_BIN: (typeof process !== 'undefined' && process.env?.ANNOUNCEMENTS_BIN) || '68d66c3143b1c97be950c256', // 📢 يُفضل استخدام متغير البيئة
   CODES_BIN: (typeof process !== 'undefined' && process.env?.CODES_BIN) || '68dbee59d0ea881f4090882b', // 🧩 ضع معرف Bin الخاص بالأكواد هنا
