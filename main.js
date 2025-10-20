@@ -411,12 +411,40 @@ function generateSessionId() {
 }
 
 async function getCodesCentral() {
-  if (!JSONBIN_CONFIG.CODES_BIN) return null;
-  const record = await fetchFromBin(JSONBIN_CONFIG.CODES_BIN);
-  if (!record) return null;
-  // دعم شكلين: {codes, locks} أو كائن الأكواد مباشرة
-  if (record.codes) return { codes: record.codes, locks: record.locks || {} };
-  return { codes: record, locks: record.locks || {} };
+  if (!JSONBIN_CONFIG.CODES_BIN) {
+    console.warn('⚠️ CODES_BIN غير محدد - استخدام البيانات المحلية');
+    return { codes: STUDENT_CODES, locks: {} };
+  }
+  
+  try {
+    console.log('🔄 جاري تحميل الأكواد من النظام المركزي...');
+    const record = await fetchFromBin(JSONBIN_CONFIG.CODES_BIN);
+    
+    if (!record) {
+      console.warn('⚠️ لم يتم العثور على بيانات في CODES_BIN - سيتم إنشاء بيانات جديدة');
+      // إنشاء بيانات جديدة في النظام المركزي
+      const newData = { codes: STUDENT_CODES, locks: {} };
+      await saveToBin(JSONBIN_CONFIG.CODES_BIN, newData);
+      return newData;
+    }
+    
+    // دعم شكلين: {codes, locks} أو كائن الأكواد مباشرة
+    if (record.codes) {
+      console.log('✅ تم تحميل الأكواد من النظام المركزي بنجاح');
+      return { codes: record.codes, locks: record.locks || {} };
+    }
+    
+    console.log('✅ تم تحميل الأكواد (تنسيق قديم) - سيتم تحويلها للتنسيق الجديد');
+    const convertedData = { codes: record, locks: {} };
+    // تحديث التنسيق في النظام المركزي
+    await saveToBin(JSONBIN_CONFIG.CODES_BIN, convertedData);
+    return convertedData;
+    
+  } catch (error) {
+    console.error('❌ خطأ في تحميل الأكواد من النظام المركزي:', error.message);
+    console.log('🔄 استخدام البيانات المحلية كبديل مؤقت');
+    return { codes: STUDENT_CODES, locks: {} };
+  }
 }
 
 async function setCodesCentral(updater) {
@@ -1182,20 +1210,34 @@ async function onStudentLogin(e) {
   }
 
   const useCentral = !!JSONBIN_CONFIG.CODES_BIN;
+  console.log('🔍 حالة النظام:', { useCentral, CODES_BIN: JSONBIN_CONFIG.CODES_BIN });
 
   try {
-    // Load codes map (central first, fallback to local)
+    // تحميل الأكواد (مركزي أولاً، ثم محلي)
     let codesMap;
     let central;
+    
     if (useCentral) {
+      console.log('🌍 محاولة استخدام النظام المركزي...');
       central = await getCodesCentral();
-      codesMap = central?.codes || getCodes();
+      codesMap = central?.codes;
+      
+      if (!codesMap) {
+        console.warn('⚠️ فشل في تحميل الأكواد من النظام المركزي - استخدام البيانات المحلية');
+        codesMap = getCodes();
+      }
+      
+      console.log('📂 عدد الأكواد المحملة:', Object.keys(codesMap || {}).length);
     } else {
+      console.log('💾 استخدام النظام المحلي فقط');
       codesMap = getCodes();
     }
 
-    if (!codesMap[code]) {
-      toastError('كود الطالب غير صحيح, الرجاء التحقق من الكود');
+    // فحص وجود الكود مع رسائل واضحة
+    if (!codesMap || !codesMap[code]) {
+      console.error('❌ كود غير موجود:', code);
+      console.log('📁 الأكواد المتاحة:', Object.keys(codesMap || {}));
+      toastError(`❌ كود الطالب "${code}" غير صحيح!\nالرجاء التحقق من الكود أو مراجعة إدارة المدرسة`, 6000);
       return;
     }
 
