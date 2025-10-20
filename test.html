@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 اختبار شامل للتطبيق</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            padding: 2rem;
+            background: #f8fafc;
+            line-height: 1.6;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+        }
+        .test-section h2 {
+            color: #2563eb;
+            margin-bottom: 1rem;
+        }
+        .test-result {
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 0.25rem;
+            font-weight: bold;
+        }
+        .test-pass {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .test-fail {
+            background: #fee2e2;
+            color: #7f1d1d;
+            border: 1px solid #ef4444;
+        }
+        .test-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+        }
+        .test-info {
+            background: #dbeafe;
+            color: #1e3a8a;
+            border: 1px solid #3b82f6;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 0.5rem;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            color: white;
+        }
+        .stat-pass { background: #10b981; }
+        .stat-fail { background: #ef4444; }
+        .stat-warning { background: #f59e0b; }
+        .stat-info { background: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 style="text-align: center; color: #1f2937; margin-bottom: 2rem;">
+            🧪 اختبار شامل لموقع واجبات ثانوية الوائلي
+        </h1>
+        
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <button onclick="runAllTests()">🚀 تشغيل جميع الاختبارات</button>
+            <button onclick="clearResults()">🧹 مسح النتائج</button>
+        </div>
+
+        <div id="testResults"></div>
+        
+        <div class="stats" id="testStats" style="display: none;">
+            <div class="stat-card stat-pass">
+                <h3>نجح</h3>
+                <span id="passCount">0</span>
+            </div>
+            <div class="stat-card stat-fail">
+                <h3>فشل</h3>
+                <span id="failCount">0</span>
+            </div>
+            <div class="stat-card stat-warning">
+                <h3>تحذير</h3>
+                <span id="warningCount">0</span>
+            </div>
+            <div class="stat-card stat-info">
+                <h3>معلومة</h3>
+                <span id="infoCount">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let testResults = [];
+        
+        // إحصائيات الاختبارات
+        let stats = {
+            pass: 0,
+            fail: 0,
+            warning: 0,
+            info: 0
+        };
+
+        function addTestResult(name, result, type = 'info', details = '') {
+            const testResult = { name, result, type, details, timestamp: new Date() };
+            testResults.push(testResult);
+            stats[type]++;
+            
+            const resultsDiv = document.getElementById('testResults');
+            const testDiv = document.createElement('div');
+            testDiv.className = 'test-section';
+            testDiv.innerHTML = `
+                <h3>${name}</h3>
+                <div class="test-result test-${type}">
+                    ${getStatusIcon(type)} ${result}
+                </div>
+                ${details ? `<p style="margin-top: 1rem; color: #6b7280;">${details}</p>` : ''}
+            `;
+            resultsDiv.appendChild(testDiv);
+            
+            updateStats();
+        }
+
+        function getStatusIcon(type) {
+            const icons = {
+                pass: '✅',
+                fail: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+            return icons[type] || 'ℹ️';
+        }
+
+        function updateStats() {
+            document.getElementById('passCount').textContent = stats.pass;
+            document.getElementById('failCount').textContent = stats.fail;
+            document.getElementById('warningCount').textContent = stats.warning;
+            document.getElementById('infoCount').textContent = stats.info;
+            document.getElementById('testStats').style.display = 'grid';
+        }
+
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '';
+            document.getElementById('testStats').style.display = 'none';
+            testResults = [];
+            stats = { pass: 0, fail: 0, warning: 0, info: 0 };
+        }
+
+        // الاختبارات الأساسية
+        function testBrowserSupport() {
+            const features = {
+                localStorage: typeof localStorage !== 'undefined',
+                fetch: typeof fetch !== 'undefined',
+                abortController: typeof AbortController !== 'undefined',
+                promises: typeof Promise !== 'undefined',
+                es6: (() => { try { eval('const test = () => {};'); return true; } catch { return false; } })(),
+                webgl: !!window.WebGLRenderingContext,
+                serviceWorker: 'serviceWorker' in navigator
+            };
+
+            let supported = 0;
+            let total = Object.keys(features).length;
+            
+            for (const [feature, isSupported] of Object.entries(features)) {
+                if (isSupported) {
+                    supported++;
+                    addTestResult(`دعم ${feature}`, 'مدعوم', 'pass');
+                } else {
+                    addTestResult(`دعم ${feature}`, 'غير مدعوم', 'warning');
+                }
+            }
+
+            const percentage = Math.round((supported / total) * 100);
+            if (percentage >= 90) {
+                addTestResult('دعم المتصفح العام', `${percentage}% - ممتاز`, 'pass');
+            } else if (percentage >= 70) {
+                addTestResult('دعم المتصفح العام', `${percentage}% - جيد`, 'warning');
+            } else {
+                addTestResult('دعم المتصفح العام', `${percentage}% - ضعيف`, 'fail');
+            }
+        }
+
+        function testNetworkConnectivity() {
+            const isOnline = navigator.onLine;
+            
+            if (isOnline) {
+                addTestResult('حالة الاتصال', 'متصل بالإنترنت', 'pass');
+                
+                // اختبار الوصول لـ JSONBin
+                fetch('https://api.jsonbin.io/v3/', { method: 'GET' })
+                    .then(response => {
+                        if (response.ok) {
+                            addTestResult('الوصول لـ JSONBin', 'يعمل بشكل صحيح', 'pass');
+                        } else {
+                            addTestResult('الوصول لـ JSONBin', `خطأ HTTP: ${response.status}`, 'fail');
+                        }
+                    })
+                    .catch(error => {
+                        addTestResult('الوصول لـ JSONBin', `خطأ في الاتصال: ${error.message}`, 'fail');
+                    });
+            } else {
+                addTestResult('حالة الاتصال', 'غير متصل بالإنترنت', 'warning');
+            }
+        }
+
+        function testDOMElements() {
+            const requiredElements = [
+                'authSection',
+                'studentLoginSection', 
+                'dashboardSection',
+                'signInBtn',
+                'signOutBtn',
+                'themeToggle',
+                'toaster',
+                'modalOverlay'
+            ];
+
+            let foundElements = 0;
+            
+            requiredElements.forEach(elementId => {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    foundElements++;
+                    addTestResult(`عنصر ${elementId}`, 'موجود', 'pass');
+                } else {
+                    addTestResult(`عنصر ${elementId}`, 'مفقود', 'fail');
+                }
+            });
+
+            const percentage = Math.round((foundElements / requiredElements.length) * 100);
+            addTestResult('عناصر DOM', `${foundElements}/${requiredElements.length} (${percentage}%)`, 
+                percentage === 100 ? 'pass' : 'warning');
+        }
+
+        function testLocalStorage() {
+            try {
+                // اختبار الكتابة
+                localStorage.setItem('test_key', 'test_value');
+                
+                // اختبار القراءة
+                const value = localStorage.getItem('test_key');
+                if (value === 'test_value') {
+                    addTestResult('localStorage - القراءة/الكتابة', 'يعمل بشكل صحيح', 'pass');
+                } else {
+                    addTestResult('localStorage - القراءة/الكتابة', 'قيمة خاطئة', 'fail');
+                }
+                
+                // اختبار الحذف
+                localStorage.removeItem('test_key');
+                if (!localStorage.getItem('test_key')) {
+                    addTestResult('localStorage - الحذف', 'يعمل بشكل صحيح', 'pass');
+                } else {
+                    addTestResult('localStorage - الحذف', 'فشل في الحذف', 'fail');
+                }
+                
+                // اختبار JSON
+                const testObj = { test: 'value', number: 123 };
+                localStorage.setItem('test_json', JSON.stringify(testObj));
+                const parsedObj = JSON.parse(localStorage.getItem('test_json'));
+                
+                if (parsedObj.test === 'value' && parsedObj.number === 123) {
+                    addTestResult('localStorage - JSON', 'يعمل بشكل صحيح', 'pass');
+                } else {
+                    addTestResult('localStorage - JSON', 'خطأ في تحليل JSON', 'fail');
+                }
+                
+                localStorage.removeItem('test_json');
+                
+            } catch (error) {
+                addTestResult('localStorage', `خطأ: ${error.message}`, 'fail');
+            }
+        }
+
+        function testFontLoading() {
+            // فحص تحميل الخطوط العربية
+            const testElement = document.createElement('div');
+            testElement.style.fontFamily = 'Noto Sans Arabic, Arial';
+            testElement.style.position = 'absolute';
+            testElement.style.visibility = 'hidden';
+            testElement.textContent = 'اختبار الخط العربي';
+            document.body.appendChild(testElement);
+            
+            const computedStyle = window.getComputedStyle(testElement);
+            const fontFamily = computedStyle.fontFamily;
+            
+            if (fontFamily.includes('Noto Sans Arabic')) {
+                addTestResult('خط Noto Sans Arabic', 'محمل بنجاح', 'pass');
+            } else {
+                addTestResult('خط Noto Sans Arabic', 'غير محمل - استخدام خط بديل', 'warning');
+            }
+            
+            document.body.removeChild(testElement);
+        }
+
+        function testResponsiveDesign() {
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            addTestResult('حجم العرض', `${viewportWidth}x${viewportHeight}`, 'info');
+            
+            if (viewportWidth < 768) {
+                addTestResult('نوع الجهاز', 'هاتف محمول', 'info');
+            } else if (viewportWidth < 1024) {
+                addTestResult('نوع الجهاز', 'جهاز لوحي', 'info');
+            } else {
+                addTestResult('نوع الجهاز', 'سطح مكتب', 'info');
+            }
+
+            // فحص دعم Media Queries
+            if (window.matchMedia) {
+                addTestResult('Media Queries', 'مدعوم', 'pass');
+            } else {
+                addTestResult('Media Queries', 'غير مدعوم', 'warning');
+            }
+        }
+
+        function testPerformance() {
+            const start = performance.now();
+            
+            // محاكاة عملية معقدة
+            for (let i = 0; i < 100000; i++) {
+                Math.random();
+            }
+            
+            const end = performance.now();
+            const executionTime = end - start;
+            
+            if (executionTime < 10) {
+                addTestResult('الأداء', `${executionTime.toFixed(2)}ms - ممتاز`, 'pass');
+            } else if (executionTime < 50) {
+                addTestResult('الأداء', `${executionTime.toFixed(2)}ms - جيد`, 'warning');
+            } else {
+                addTestResult('الأداء', `${executionTime.toFixed(2)}ms - بطيء`, 'fail');
+            }
+        }
+
+        function testSecurity() {
+            // فحص HTTPS
+            if (location.protocol === 'https:') {
+                addTestResult('بروتوكول HTTPS', 'آمن', 'pass');
+            } else {
+                addTestResult('بروتوكول HTTPS', 'غير آمن - يُنصح بـ HTTPS', 'warning');
+            }
+
+            // فحص المحتوى المختلط
+            if (location.protocol === 'https:' && document.querySelectorAll('img[src^="http:"], script[src^="http:"], link[href^="http:"]').length > 0) {
+                addTestResult('المحتوى المختلط', 'موجود - مشكلة أمنية', 'fail');
+            } else {
+                addTestResult('المحتوى المختلط', 'غير موجود', 'pass');
+            }
+        }
+
+        function testAccessibility() {
+            // فحص وجود alt text للصور
+            const images = document.querySelectorAll('img');
+            let imagesWithAlt = 0;
+            
+            images.forEach(img => {
+                if (img.alt && img.alt.trim().length > 0) {
+                    imagesWithAlt++;
+                }
+            });
+            
+            if (images.length === 0) {
+                addTestResult('نص بديل للصور', 'لا توجد صور', 'info');
+            } else if (imagesWithAlt === images.length) {
+                addTestResult('نص بديل للصور', `جميع الصور لديها نص بديل (${imagesWithAlt}/${images.length})`, 'pass');
+            } else {
+                addTestResult('نص بديل للصور', `${imagesWithAlt}/${images.length} صور لديها نص بديل`, 'warning');
+            }
+
+            // فحص استخدام ARIA
+            const ariaElements = document.querySelectorAll('[aria-label], [aria-describedby], [role]');
+            addTestResult('استخدام ARIA', `${ariaElements.length} عنصر يستخدم ARIA`, ariaElements.length > 0 ? 'pass' : 'warning');
+        }
+
+        async function runAllTests() {
+            clearResults();
+            
+            addTestResult('بدء الاختبارات', 'جاري تشغيل الاختبارات الشاملة...', 'info');
+            
+            // تشغيل الاختبارات بتسلسل
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testBrowserSupport();
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testNetworkConnectivity();
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testDOMElements();
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testLocalStorage();
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testFontLoading();
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testResponsiveDesign();
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testPerformance();
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testSecurity();
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            testAccessibility();
+            
+            // تقرير نهائي
+            const total = stats.pass + stats.fail + stats.warning + stats.info;
+            const successRate = Math.round(((stats.pass) / (stats.pass + stats.fail)) * 100);
+            
+            addTestResult('التقرير النهائي', 
+                `تم إجراء ${total} اختبار - معدل النجاح: ${successRate}%`, 
+                successRate >= 90 ? 'pass' : successRate >= 70 ? 'warning' : 'fail',
+                `نجح: ${stats.pass}, فشل: ${stats.fail}, تحذير: ${stats.warning}, معلومة: ${stats.info}`
+            );
+        }
+
+        // تشغيل اختبارات أولية عند التحميل
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addTestResult('تحميل الصفحة', 'تم تحميل صفحة الاختبار بنجاح', 'pass');
+                testBrowserSupport();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

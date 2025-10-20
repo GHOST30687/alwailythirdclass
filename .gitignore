@@ -1,0 +1,32 @@
+# الملفات الحساسة - لا يجب رفعها للـ repository
+config.js
+.env
+.env.local
+
+# ملفات النظام
+.DS_Store
+Thumbs.db
+
+# مجلدات البناء والتطوير
+node_modules/
+dist/
+build/
+
+# ملفات الخطوط المحملة محلياً (اختيارية)
+fonts/*.ttf
+fonts/*.woff
+fonts/*.woff2
+
+# ملفات IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ملفات السجلات
+*.log
+npm-debug.log*
+
+# ملفات مؤقتة
+*.tmp
+*.temp

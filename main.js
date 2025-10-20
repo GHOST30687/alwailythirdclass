@@ -1,26 +1,113 @@
 import { STUDENT_CODES } from './data/studentCodes.js';
 
-// ⚠️ JSONBin.io Configuration - يجب نقل هذه المعلومات إلى متغيرات البيئة في بيئة الإنتاج
-// في بيئة المتصفح، لا يمكن استخدام process.env مباشرة، لذلك نستخدم القيم الافتراضية
-const JSONBIN_CONFIG = {
-  API_KEY: (typeof process !== 'undefined' && process.env?.JSONBIN_API_KEY) || '$2a$10$cp2Iez6m4n5Kz6mx2uXg8ukO5.UmSmZXW5wyd5u7zAN0tmCTck6zi', // 🔑 يُفضل استخدام متغير البيئة
-  HOMEWORK_BIN: (typeof process !== 'undefined' && process.env?.HOMEWORK_BIN) || '68d66c19d0ea881f408bb3b3', // 📚 يُفضل استخدام متغير البيئة
-  ANNOUNCEMENTS_BIN: (typeof process !== 'undefined' && process.env?.ANNOUNCEMENTS_BIN) || '68d66c3143b1c97be950c256', // 📢 يُفضل استخدام متغير البيئة
-  CODES_BIN: (typeof process !== 'undefined' && process.env?.CODES_BIN) || '68dbee59d0ea881f4090882b', // 🧩 ضع معرف Bin الخاص بالأكواد هنا
-  BASE_URL: 'https://api.jsonbin.io/v3/b'
+// 🔐 محاولة تحميل الإعدادات من config.js أولاً، ثم القيم الافتراضية
+let CONFIG = {
+  JSONBIN_API_KEY: '$2a$10$cp2Iez6m4n5Kz6mx2uXg8ukO5.UmSmZXW5wyd5u7zAN0tmCTck6zi',
+  BINS: {
+    HOMEWORK: '68d66c19d0ea881f408bb3b3',
+    ANNOUNCEMENTS: '68d66c3143b1c97be950c256', 
+    CODES: '68dbee59d0ea881f4090882b'
+  },
+  BASE_URL: 'https://api.jsonbin.io/v3/b',
+  ADMIN: {
+    CODE: 'baqermanee',
+    NAME: 'باقر أسعد حسين'
+  },
+  SETTINGS: {
+    LOCK_TTL_MS: 120000,
+    HEARTBEAT_INTERVAL_MS: 30000,
+    REQUEST_TIMEOUT_MS: 10000,
+    AUTO_ARCHIVE_INTERVAL_MS: 60000
+  }
 };
 
-// Simple toast system
-const toaster = document.getElementById('toaster');
-function toast(message, type = 'success', timeout = 2200) {
-  const div = document.createElement('div');
-  div.className = `toast ${type} animate-slide-up`;
-  div.textContent = message;
-  toaster.appendChild(div);
-  setTimeout(() => div.remove(), timeout);
+// محاولة تحميل الإعدادات المخصصة إن وُجدت
+try {
+  const { CONFIG: customConfig } = await import('./config.js');
+  CONFIG = { ...CONFIG, ...customConfig };
+  console.log('✅ تم تحميل الإعدادات المخصصة بنجاح');
+} catch (error) {
+  console.warn('⚠️ لم يتم العثور على ملف config.js، سيتم استخدام الإعدادات الافتراضية');
+  console.warn('💡 لتخصيص الإعدادات، انسخ config.example.js إلى config.js وقم بتعديله');
 }
-const toastSuccess = (m) => toast(m, 'success');
-const toastError = (m) => toast(m, 'error');
+
+// التوافق مع الكود القديم
+const JSONBIN_CONFIG = {
+  API_KEY: CONFIG.JSONBIN_API_KEY,
+  HOMEWORK_BIN: CONFIG.BINS.HOMEWORK,
+  ANNOUNCEMENTS_BIN: CONFIG.BINS.ANNOUNCEMENTS,
+  CODES_BIN: CONFIG.BINS.CODES,
+  BASE_URL: CONFIG.BASE_URL
+};
+
+// 🎉 Enhanced toast system with better UX
+const toaster = document.getElementById('toaster');
+let toastCounter = 0;
+
+function toast(message, type = 'success', timeout = 3000) {
+  if (!toaster) {
+    console.warn('⚠️ Toaster element not found, falling back to console');
+    console.log(`${type.toUpperCase()}: ${message}`);
+    return;
+  }
+  
+  const toastId = `toast-${++toastCounter}`;
+  const div = document.createElement('div');
+  div.id = toastId;
+  div.className = `toast ${type} animate-slide-up`;
+  div.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  div.setAttribute('aria-live', 'polite');
+  
+  // إضافة زر إغلاق اختياري للرسائل الطويلة
+  const hasCloseButton = message.length > 50 || timeout > 5000;
+  
+  div.innerHTML = `
+    <span class="toast-message">${message}</span>
+    ${hasCloseButton ? `<button class="toast-close" onclick="document.getElementById('${toastId}').remove()" aria-label="إغلاق">×</button>` : ''}
+  `;
+  
+  // تحديد عدد التوستات القصوى
+  const maxToasts = 5;
+  const existingToasts = toaster.children;
+  if (existingToasts.length >= maxToasts) {
+    // إزالة أقدم toast
+    existingToasts[0]?.remove();
+  }
+  
+  toaster.appendChild(div);
+  
+  // إزالة تلقائية بعد المهلة المحددة
+  if (!hasCloseButton || timeout < 10000) {
+    setTimeout(() => {
+      if (document.getElementById(toastId)) {
+        div.style.opacity = '0';
+        div.style.transform = 'translateY(-10px)';
+        setTimeout(() => div.remove(), 300);
+      }
+    }, timeout);
+  }
+}
+
+const toastSuccess = (message, timeout = 3000) => toast(message, 'success', timeout);
+const toastError = (message, timeout = 5000) => toast(message, 'error', timeout);
+const toastWarning = (message, timeout = 4000) => toast(message, 'warning', timeout);
+const toastInfo = (message, timeout = 3000) => toast(message, 'info', timeout);
+
+// دالة لعرض معلومات حالة النظام
+function showSystemStatus() {
+  const support = getFeatureSupport();
+  const issues = [];
+  
+  if (!support.localStorage) issues.push('⚠️ التخزين المحلي غير مدعوم');
+  if (!support.fetch) issues.push('⚠️ fetch API غير مدعوم');
+  if (!support.online) issues.push('⚠️ لا يوجد اتصال بالإنترنت');
+  
+  if (issues.length > 0) {
+    toastWarning(`تحذيرات النظام:\n${issues.join('\n')}`, 8000);
+  } else {
+    console.log('✅ جميع ميزات النظام مدعومة');
+  }
+}
 
 // Local storage helpers
 const LS_KEYS = {
@@ -32,7 +119,7 @@ const LS_KEYS = {
   ANNOUNCEMENTS: 'announcements.all',
 };
 
-// JSONBin.io API Functions
+// 🌐 JSONBin.io API Functions - محسّنة للتوافق مع جميع المتصفحات
 async function fetchFromBin(binId) {
   if (!binId || !JSONBIN_CONFIG.API_KEY) {
     console.warn('Missing binId or API key for JSONBin operation');
@@ -40,30 +127,46 @@ async function fetchFromBin(binId) {
   }
   
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+    const timeoutMs = CONFIG.SETTINGS?.REQUEST_TIMEOUT_MS || 10000;
     
-    const response = await fetch(`${JSONBIN_CONFIG.BASE_URL}/${binId}/latest`, {
+    // دعم AbortController مع fallback للمتصفحات القديمة
+    let controller, timeoutId;
+    const fetchOptions = {
+      method: 'GET',
       headers: {
         'X-Master-Key': JSONBIN_CONFIG.API_KEY,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
-      signal: controller.signal
-    });
+      cache: 'no-cache' // منع التخزين المؤقت للبيانات الحساسة
+    };
     
-    clearTimeout(timeoutId);
+    // إضافة AbortController إن كان مدعوماً
+    if (typeof AbortController !== 'undefined') {
+      controller = new AbortController();
+      fetchOptions.signal = controller.signal;
+      timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    }
+    
+    const response = await fetch(`${JSONBIN_CONFIG.BASE_URL}/${binId}/latest`, fetchOptions);
+    
+    if (timeoutId) clearTimeout(timeoutId);
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
     const data = await response.json();
+    
+    // تسجيل نجاح العملية
+    console.log(`✅ تم تحميل البيانات مع JSONBin: ${binId}`);
+    
     return data.record;
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('JSONBin fetch request timed out');
+      console.error('⏱️ JSONBin fetch request timed out');
     } else {
-      console.error('Error fetching from JSONBin:', error.message);
+      console.error('❌ خطأ في تحميل البيانات من JSONBin:', error.message);
     }
     return null;
   }
@@ -71,63 +174,148 @@ async function fetchFromBin(binId) {
 
 async function saveToBin(binId, data) {
   if (!binId || !JSONBIN_CONFIG.API_KEY || !data) {
-    console.warn('Missing required parameters for JSONBin save operation');
+    console.warn('❌ معاملات مطلوبة مفقودة في عملية الحفظ JSONBin');
     return false;
   }
   
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout for saves
+    const timeoutMs = (CONFIG.SETTINGS?.REQUEST_TIMEOUT_MS || 10000) * 1.5; // مهلة أطول للحفظ
     
-    const response = await fetch(`${JSONBIN_CONFIG.BASE_URL}/${binId}`, {
+    let controller, timeoutId;
+    const fetchOptions = {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'X-Master-Key': JSONBIN_CONFIG.API_KEY
       },
       body: JSON.stringify(data),
-      signal: controller.signal
-    });
+      cache: 'no-cache'
+    };
     
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // دعم AbortController مع fallback
+    if (typeof AbortController !== 'undefined') {
+      controller = new AbortController();
+      fetchOptions.signal = controller.signal;
+      timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     }
     
+    const response = await fetch(`${JSONBIN_CONFIG.BASE_URL}/${binId}`, fetchOptions);
+    
+    if (timeoutId) clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    console.log(`✅ تم حفظ البيانات بنجاح في JSONBin: ${binId}`);
     return true;
+    
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('JSONBin save request timed out');
+      console.error('⏱️ انتهت مهلة حفظ JSONBin');
     } else {
-      console.error('Error saving to JSONBin:', error.message);
+      console.error('❌ خطأ في حفظ البيانات في JSONBin:', error.message);
     }
     return false;
   }
 }
 
-// Local storage fallback functions with enhanced error handling
+// 💾 Local storage fallback functions with enhanced error handling
 const getJSON = (key, defaultValue) => {
   if (!key) return defaultValue;
+  
+  // فحص دعم localStorage
+  if (typeof localStorage === 'undefined') {
+    console.warn('⚠️ localStorage غير مدعوم في هذا المتصفح');
+    return defaultValue;
+  }
+  
   try {
     const value = localStorage.getItem(key);
-    return value ? JSON.parse(value) : defaultValue;
+    if (!value) return defaultValue;
+    
+    const parsed = JSON.parse(value);
+    return parsed;
   } catch (error) {
-    console.warn(`Error reading from localStorage key "${key}":`, error.message);
+    console.warn(`❌ خطأ في قراءة localStorage للمفتاح "${key}":`, error.message);
+    
+    // محاولة مسح القيمة التالفة
+    try {
+      localStorage.removeItem(key);
+      console.log(`🧹 تم مسح القيمة التالفة للمفتاح "${key}"`);
+    } catch (cleanupError) {
+      console.error(`❌ فشل في مسح القيمة التالفة:`, cleanupError.message);
+    }
+    
     return defaultValue;
   }
 };
 
 const setJSON = (key, value) => {
   if (!key) return false;
+  
+  // فحص دعم localStorage
+  if (typeof localStorage === 'undefined') {
+    console.warn('⚠️ localStorage غير مدعوم في هذا المتصفح');
+    return false;
+  }
+  
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    const serialized = JSON.stringify(value);
+    localStorage.setItem(key, serialized);
     return true;
   } catch (error) {
-    console.error(`Error writing to localStorage key "${key}":`, error.message);
+    // فحص إذا كان الخطأ بسبب امتلاء التخزين
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      console.error(`📦 localStorage ممتلئ - محاولة تنظيف بعض البيانات`);
+      
+      // محاولة مسح بعض البيانات القديمة/غير المهمة
+      try {
+        const keysToCheck = ['temp_', 'cache_', 'old_'];
+        let cleaned = false;
+        
+        for (let i = 0; i < localStorage.length; i++) {
+          const existingKey = localStorage.key(i);
+          if (existingKey && keysToCheck.some(prefix => existingKey.startsWith(prefix))) {
+            localStorage.removeItem(existingKey);
+            cleaned = true;
+            i--; // تعديل الفهرس بعد الحذف
+          }
+        }
+        
+        if (cleaned) {
+          // محاولة أخرى
+          localStorage.setItem(key, JSON.stringify(value));
+          console.log(`✅ تم حفظ البيانات بعد التنظيف`);
+          return true;
+        }
+      } catch (retryError) {
+        console.error(`❌ فشل في المحاولة الثانية:`, retryError.message);
+      }
+    }
+    
+    console.error(`❌ خطأ في كتابة localStorage للمفتاح "${key}":`, error.message);
     return false;
   }
 };
+
+// دالة مساعدة لفحص حالة الشبكة
+function isOnline() {
+  return typeof navigator !== 'undefined' && navigator.onLine !== false;
+}
+
+// دالة مساعدة لفحص دعم الميزات الحديثة
+function getFeatureSupport() {
+  return {
+    localStorage: typeof localStorage !== 'undefined',
+    fetch: typeof fetch !== 'undefined',
+    abortController: typeof AbortController !== 'undefined',
+    serviceWorker: 'serviceWorker' in navigator,
+    webgl: !!window.WebGLRenderingContext,
+    online: isOnline()
+  };
+}
 
 // Theme management functions
 function isDarkMode() {
@@ -998,11 +1186,11 @@ async function onStudentLogin(e) {
       return;
     }
 
-    const isAdmin = code === 'baqermanee';
+    const isAdmin = code === CONFIG.ADMIN.CODE;
     if (isAdmin) {
-      const requiredName = 'باقر أسعد حسين';
+      const requiredName = CONFIG.ADMIN.NAME;
       if (name !== requiredName) {
-        toastError('الحساب هو للأدمن فقط');
+        toastError(`🚫 هعا و عصام: هذا الحساب محجوز للمشرف فقط! للحصول على صلاحيات مشرف، يجب أن يكون الاسم هو: ${requiredName}`);
         return;
       }
     }
@@ -1434,34 +1622,161 @@ async function renderStats() {
   });
 }
 
-// Initialize app with error handling
+// 🚀 Initialize app with comprehensive error handling and system checks
 async function initializeApp() {
-  // تأخير قصير للتأكد من تحميل جميع العناصر
-  await new Promise(resolve => setTimeout(resolve, 100));
+  console.log('🚀 بدء تهيئة التطبيق...');
   
   try {
-    // ربط الأحداث مرة واحدة فقط
+    // 1. فحص دعم النظام وعرض التحذيرات إن لزمت
+    showSystemStatus();
+    
+    // 2. تأخير قصير لضمان تحميل جميع عناصر DOM
+    await new Promise(resolve => setTimeout(resolve, 150));
+    
+    // 3. فحص عناصر DOM المطلوبة
+    const requiredElements = {
+      'toaster': toaster,
+      'authSection': authSection,
+      'studentLoginSection': studentLoginSection,
+      'dashboardSection': dashboardSection,
+      'signInBtn': signInBtn,
+      'signOutBtn': signOutBtn,
+      'themeToggle': themeToggle
+    };
+    
+    const missingElements = Object.entries(requiredElements)
+      .filter(([name, element]) => !element)
+      .map(([name]) => name);
+    
+    if (missingElements.length > 0) {
+      throw new Error(`عناصر DOM مفقودة: ${missingElements.join(', ')}`);
+    }
+    
+    // 4. ربط الأحداث مرة واحدة فقط
     bindEvents();
+    console.log('✅ تم ربط أحداث الواجهة');
     
+    // 5. تهيئة بيانات التطبيق
+    initDatasets();
+    console.log('✅ تم تهيئة بيانات التطبيق');
+    
+    // 6. تقديم وعرض التطبيق
     await renderApp();
+    console.log('✅ تم عرض واجهة التطبيق');
     
-    // Start auto-archive timer
-    setInterval(checkAndAutoArchive, 60 * 1000);
+    // 7. بدء العمليات الآلية
+    const archiveInterval = CONFIG.SETTINGS?.AUTO_ARCHIVE_INTERVAL_MS || 60000;
+    setInterval(checkAndAutoArchive, archiveInterval);
+    
+    // فحص أولي للأرشيف
     await checkAndAutoArchive();
+    console.log('✅ تم بدء نظام الأرشيف التلقائي');
+    
+    // 8. إعداد مستمع أحداث الشبكة
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        toastSuccess('✅ تم إعادة الاتصال بالإنترنت');
+        // إعادة محاولة مزامنة البيانات
+        setTimeout(() => {
+          syncDataWithServer();
+        }, 2000);
+      });
+      
+      window.addEventListener('offline', () => {
+        toastWarning('⚠️ انقطع الاتصال بالإنترنت - العمل في الوضع المحلي');
+      });
+    }
+    
+    console.log('🎉 تم تهيئة التطبيق بنجاح!');
+    toastSuccess('✅ تم تحميل التطبيق بنجاح!');
+    
   } catch (error) {
     console.error('❌ خطأ في تهيئة التطبيق:', error);
-    toastError('حدث خطأ في تحميل التطبيق');
+    toastError(`❌ حدث خطأ في تحميل التطبيق: ${error.message}`);
     
-    // Fallback: show authSection manually if there's an error
-    if (authSection) {
-      authSection.classList.remove('hidden');
-    }
-    if (studentLoginSection) {
-      studentLoginSection.classList.add('hidden');
-    }
-    if (dashboardSection) {
-      dashboardSection.classList.add('hidden');
-    }
+    // عرض واجهة طوارئ بالص إن كان هناك خطأ
+    showEmergencyFallback();
+  }
+}
+
+// دالة عرض واجهة طوارئ في حالة فشل التهيئة
+function showEmergencyFallback() {
+  const body = document.body;
+  body.innerHTML = `
+    <div style="
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'Arial', sans-serif;
+      padding: 2rem;
+    ">
+      <div style="
+        background: white;
+        padding: 3rem;
+        border-radius: 1rem;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        text-align: center;
+        max-width: 500px;
+        width: 100%;
+      ">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">🚔</div>
+        <h1 style="font-size: 2rem; color: #333; margin-bottom: 1rem;">خطأ في التطبيق</h1>
+        <p style="color: #666; margin-bottom: 2rem; line-height: 1.6;">
+          عذراً، حدث خطأ في تحميل التطبيق. يُرجى المحاولة مرة أخرى.
+        </p>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+          <button onclick="location.reload()" style="
+            background: #2563eb;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+          ">⚙️ إعادة تحميل</button>
+          <button onclick="localStorage.clear(); location.reload()" style="
+            background: #dc2626;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+          ">🧹 مسح البيانات وإعادة البدء</button>
+        </div>
+        <p style="color: #999; font-size: 0.875rem; margin-top: 2rem;">
+          إذا استمر الخطأ، يُرجى التواصل مع إدارة المدرسة.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+// دالة مزامنة البيانات مع السيرفر
+async function syncDataWithServer() {
+  if (!isOnline()) {
+    console.log('⚠️ غير متصل بالإنترنت - تم تأجيل المزامنة');
+    return;
+  }
+  
+  try {
+    console.log('🔄 بدء مزامنة البيانات...');
+    
+    // مزامنة الواجبات، التبليغات، والأكواد
+    await Promise.all([
+      getHomework(),
+      getAnnouncements(),
+      getCodesCentral()
+    ]);
+    
+    console.log('✅ تمت مزامنة البيانات بنجاح');
+    
+  } catch (error) {
+    console.error('❌ خطأ في مزامنة البيانات:', error.message);
   }
 }
 
